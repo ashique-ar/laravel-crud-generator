@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests;
 
-use Orchestra\Testbench\TestCase as BaseTestCase;
 use AshiqueAr\LaravelCrudGenerator\CrudGeneratorServiceProvider;
+use Orchestra\Testbench\TestCase as BaseTestCase;
 
 /**
  * Base test case for the Laravel CRUD Generator package.
@@ -24,7 +24,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Get package providers.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @return array<string>
      */
     protected function getPackageProviders($app): array
@@ -37,7 +37,7 @@ abstract class TestCase extends BaseTestCase
     /**
      * Define environment setup.
      *
-     * @param \Illuminate\Foundation\Application $app
+     * @param  \Illuminate\Foundation\Application  $app
      */
     protected function defineEnvironment($app): void
     {
@@ -73,8 +73,6 @@ abstract class TestCase extends BaseTestCase
      */
     protected function setUpDatabase(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/database/migrations');
     }
 }
-
-

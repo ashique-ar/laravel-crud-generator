@@ -36,8 +36,6 @@ class InstallCrudGenerator extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
     public function handle(): int
     {
@@ -51,7 +49,7 @@ class InstallCrudGenerator extends Command
             $this->createDirectories();
 
             // Generate permissions if not skipped
-            if (!$this->option('skip-permissions')) {
+            if (! $this->option('skip-permissions')) {
                 $this->call('crud:permissions');
             }
 
@@ -60,7 +58,8 @@ class InstallCrudGenerator extends Command
 
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Installation failed: ' . $e->getMessage());
+            $this->error('Installation failed: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }
@@ -74,9 +73,10 @@ class InstallCrudGenerator extends Command
 
         $configExists = File::exists(config_path('crud.php'));
 
-        if ($configExists && !$this->option('force')) {
-            if (!$this->confirm('Configuration file already exists. Overwrite?')) {
+        if ($configExists && ! $this->option('force')) {
+            if (! $this->confirm('Configuration file already exists. Overwrite?')) {
                 $this->warn('Skipped configuration publishing.');
+
                 return;
             }
         }
@@ -103,7 +103,7 @@ class InstallCrudGenerator extends Command
         ];
 
         foreach ($directories as $directory) {
-            if (!File::exists($directory)) {
+            if (! File::exists($directory)) {
                 File::makeDirectory($directory, 0755, true);
                 $this->info("✓ Created directory: {$directory}");
             } else {
@@ -123,9 +123,12 @@ class InstallCrudGenerator extends Command
 
         $this->line('<options=bold>Next Steps:</>');
         $this->line('1. Configure your CRUD resources in <comment>config/crud.php</comment>');
-        $this->line('2. Generate custom logic classes: <comment>php artisan make:crud-logic</comment>');
-        $this->line('3. Add new CRUD resources: <comment>php artisan make:crud-resource</comment>');
-        $this->line('4. Review generated permissions in your admin panel');
+        $this->line('2. Register routes in your <comment>routes/api.php</comment> or <comment>RouteServiceProvider</comment>:');
+        $this->line('   <comment>use AshiqueAr\\LaravelCrudGenerator\\Facades\\CrudGenerator;</comment>');
+        $this->line('   <comment>CrudGenerator::registerRoutes(\'api/v1\', [\'auth:sanctum\']);</comment>');
+        $this->line('3. Generate custom logic classes: <comment>php artisan make:crud-logic</comment>');
+        $this->line('4. Add new CRUD resources: <comment>php artisan make:crud-resource</comment>');
+        $this->line('5. Review generated permissions in your admin panel');
         $this->newLine();
 
         $this->line('<options=bold>Documentation:</>');
@@ -133,5 +136,3 @@ class InstallCrudGenerator extends Command
         $this->newLine();
     }
 }
-
-

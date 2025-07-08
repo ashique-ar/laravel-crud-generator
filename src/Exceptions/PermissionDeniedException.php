@@ -8,7 +8,7 @@ use Exception;
 
 /**
  * Permission denied exception for CRUD operations.
- * 
+ *
  * This exception is thrown when a user attempts to perform
  * a CRUD operation without the required permissions.
  */
@@ -22,15 +22,12 @@ class PermissionDeniedException extends Exception
     /**
      * Create a new permission denied exception instance.
      *
-     * @param array|string $permissions
-     * @param string $message
-     * @param int $code
-     * @param Exception|null $previous
+     * @param  array|string  $permissions
      */
     public function __construct($permissions = [], string $message = 'Permission denied', int $code = 403, ?Exception $previous = null)
     {
         $this->permissions = is_array($permissions) ? $permissions : [$permissions];
-        
+
         if (empty($message) || $message === 'Permission denied') {
             $message = $this->generateMessage();
         }
@@ -60,6 +57,7 @@ class PermissionDeniedException extends Exception
         }
 
         $permissionList = implode(', ', $this->permissions);
+
         return "You do not have one of the required permissions: {$permissionList}";
     }
 
@@ -69,6 +67,7 @@ class PermissionDeniedException extends Exception
     public static function forCrudAction(string $action, string $resource): static
     {
         $permission = "{$action}-{$resource}";
+
         return new static([$permission], "You do not have permission to {$action} {$resource} resources.");
     }
 
@@ -80,5 +79,3 @@ class PermissionDeniedException extends Exception
         return new static($permissions);
     }
 }
-
-

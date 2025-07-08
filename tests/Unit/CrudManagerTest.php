@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-use AshiqueAr\LaravelCrudGenerator\Services\CrudManager;
 use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
+use AshiqueAr\LaravelCrudGenerator\Services\CrudManager;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for CrudManager service.
@@ -18,7 +18,7 @@ class CrudManagerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->crudManager = new CrudManager();
+        $this->crudManager = new CrudManager;
     }
 
     public function test_can_instantiate_crud_manager(): void
@@ -30,7 +30,7 @@ class CrudManagerTest extends TestCase
     {
         $this->expectException(CrudException::class);
         $this->expectExceptionMessage('Resource configuration not found: invalid_resource');
-        
+
         $this->crudManager->getResourceConfig('invalid_resource');
     }
 
@@ -42,7 +42,7 @@ class CrudManagerTest extends TestCase
         ];
 
         $result = $this->crudManager->validateResourceConfig($config);
-        
+
         $this->assertTrue($result);
     }
 
@@ -50,7 +50,7 @@ class CrudManagerTest extends TestCase
     {
         $this->expectException(CrudException::class);
         $this->expectExceptionMessage('Model class is required in resource configuration');
-        
+
         $config = ['middleware' => ['auth:sanctum']];
         $this->crudManager->validateResourceConfig($config);
     }
@@ -59,12 +59,12 @@ class CrudManagerTest extends TestCase
     {
         $this->expectException(CrudException::class);
         $this->expectExceptionMessage('Model class does not exist: App\\Models\\NonExistentModel');
-        
+
         $config = [
             'model' => 'App\\Models\\NonExistentModel',
             'middleware' => ['auth:sanctum'],
         ];
-        
+
         $this->crudManager->validateResourceConfig($config);
     }
 
@@ -105,7 +105,7 @@ class CrudManagerTest extends TestCase
     public function test_gets_all_resource_names(): void
     {
         $resources = $this->crudManager->getAllResourceNames();
-        
+
         $this->assertIsArray($resources);
     }
 
@@ -121,5 +121,3 @@ class CrudManagerTest extends TestCase
         $this->assertTrue(method_exists($this->crudManager, 'createLogicInstance'));
     }
 }
-
-

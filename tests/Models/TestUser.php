@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests\Models;
 
+use AshiqueAr\LaravelCrudGenerator\Tests\Factories\TestUserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use AshiqueAr\LaravelCrudGenerator\Tests\Factories\TestUserFactory;
 
 /**
  * Test model for CRUD functionality testing.
@@ -35,5 +35,3 @@ class TestUser extends Model
         return TestUserFactory::new();
     }
 }
-
-

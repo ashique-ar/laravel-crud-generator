@@ -94,13 +94,24 @@ return [
 ];
 ```
 
-### 2. Generate Permissions
+### 2. Register Routes
+
+Add the CRUD routes to your `routes/api.php` file:
+
+```php
+use AshiqueAr\LaravelCrudGenerator\Facades\CrudGenerator;
+
+// Register all CRUD routes with prefix and middleware
+CrudGenerator::registerRoutes('api/v1', ['auth:sanctum']);
+```
+
+### 3. Generate Permissions
 
 ```bash
 php artisan crud:permissions
 ```
 
-### 3. Start Using Your API
+### 4. Start Using Your API
 
 Your CRUD endpoints are now available:
 
@@ -341,11 +352,11 @@ php artisan crud:permissions
 Access auto-generated documentation:
 
 ```bash
+# Complete API documentation for all resources
+GET /api/v1/docs
+
 # Documentation for specific resource
 GET /api/v1/users/docs
-
-# Complete API documentation
-GET /api/v1/docs
 ```
 
 Returns OpenAPI 3.0 compatible JSON that can be used with Swagger UI or similar tools.

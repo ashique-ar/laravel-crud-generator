@@ -43,8 +43,6 @@ class GenerateCrudPermissions extends Command
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
     public function handle(): int
     {
@@ -55,6 +53,7 @@ class GenerateCrudPermissions extends Command
 
             if (empty($resources)) {
                 $this->warn('No resources found in configuration.');
+
                 return Command::SUCCESS;
             }
 
@@ -65,9 +64,11 @@ class GenerateCrudPermissions extends Command
             }
 
             $this->info('✓ CRUD permissions generated successfully!');
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('Failed to generate permissions: ' . $e->getMessage());
+            $this->error('Failed to generate permissions: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }
@@ -84,13 +85,14 @@ class GenerateCrudPermissions extends Command
         }
 
         $config = config('crud.resources', []);
+
         return array_keys($config);
     }
 
     /**
      * Generate permissions for the given resources.
      *
-     * @param array<string> $resources
+     * @param  array<string>  $resources
      */
     protected function generatePermissions(array $resources): void
     {
@@ -102,12 +104,13 @@ class GenerateCrudPermissions extends Command
 
             foreach ($this->operations as $operation) {
                 $permissionName = "{$operation}-{$resource}";
-                
+
                 $exists = Permission::where('name', $permissionName)->exists();
 
-                if ($exists && !$this->option('force')) {
+                if ($exists && ! $this->option('force')) {
                     $this->warn("  ↳ Permission '{$permissionName}' already exists");
                     $skippedCount++;
+
                     continue;
                 }
 
@@ -132,8 +135,6 @@ class GenerateCrudPermissions extends Command
 
     /**
      * Assign generated permissions to a specific role.
-     *
-     * @param string $roleName
      */
     protected function assignPermissionsToRole(string $roleName): void
     {
@@ -156,5 +157,3 @@ class GenerateCrudPermissions extends Command
         $this->info("✓ Assigned {$existingPermissions->count()} permissions to role '{$roleName}'");
     }
 }
-
-

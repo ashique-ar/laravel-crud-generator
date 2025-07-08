@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Http\Controllers;
 
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
+use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Exceptions\UnauthorizedException;
-use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
-use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
 use Throwable;
 
 /**
  * Generic CRUD Controller for API endpoints.
- * 
+ *
  * This controller provides a unified interface for CRUD operations across different models.
  * Configuration is loaded from config/crud.php based on the route resource parameter.
- * 
+ *
  * Features:
  * - Automatic CRUD operations (index, show, store, update, destroy)
  * - Permission-based authorization using Spatie Laravel Permission
@@ -30,8 +30,6 @@ use Throwable;
  * - Bulk operations
  * - Soft delete handling
  * - API documentation generation
- * 
- * @package AshiqueAr\LaravelCrudGenerator\Http\Controllers
  */
 class CrudController extends Controller
 {
@@ -67,21 +65,21 @@ class CrudController extends Controller
 
     /**
      * Initialize the controller based on the route resource parameter.
-     * 
+     *
      * @throws CrudException When resource configuration is not found
      */
     public function __construct()
     {
         $route = request()->route();
         $this->resource = $route ? $route->parameter('resource') : '';
-        
-        if (!$this->resource) {
+
+        if (! $this->resource) {
             throw new CrudException('Resource parameter not found in route');
         }
 
         $this->config = config("crud.resources.{$this->resource}");
-        
-        if (!$this->config) {
+
+        if (! $this->config) {
             throw new CrudException("Resource '{$this->resource}' not configured in crud.php");
         }
 
@@ -96,19 +94,19 @@ class CrudController extends Controller
         $this->modelClass = $this->config['model'];
         $this->validationRules = $this->config['validation'] ?? [];
         $this->relations = $this->config['relations'] ?? [];
-        
+
         // Initialize custom logic handler if configured
         if (isset($this->config['logic']) && class_exists($this->config['logic'])) {
             $this->logicHandler = app($this->config['logic']);
         } else {
-            $this->logicHandler = new BaseCrudLogic();
+            $this->logicHandler = new BaseCrudLogic;
             $this->logicHandler->setModelClass($this->modelClass);
         }
     }
 
     /**
      * Display a paginated listing of the resource.
-     * 
+     *
      * Supports advanced filtering, searching, sorting, and pagination.
      * Query parameters:
      * - per_page: Number of items per page (default: 15, max: 100)
@@ -118,9 +116,7 @@ class CrudController extends Controller
      * - direction: Sort direction (asc|desc)
      * - with_trashed: Include soft deleted records (requires permission)
      * - filter[field]: Filter by specific field values
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function index(Request $request): JsonResponse
@@ -129,7 +125,7 @@ class CrudController extends Controller
 
         try {
             $query = ($this->modelClass)::query();
-            
+
             // Apply eager loading
             if ($this->relations) {
                 $query->with($this->relations);
@@ -158,7 +154,7 @@ class CrudController extends Controller
             $transformedData = $result->getCollection()->map(function ($item) use ($request) {
                 return $this->logicHandler->transformResource($item, $request);
             });
-            
+
             $result->setCollection($transformedData);
 
             return response()->json($result);
@@ -169,9 +165,7 @@ class CrudController extends Controller
 
     /**
      * Display the specified resource.
-     * 
-     * @param string $id
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function show(string $id): JsonResponse
@@ -180,7 +174,7 @@ class CrudController extends Controller
 
         try {
             $query = ($this->modelClass)::query();
-            
+
             if ($this->relations) {
                 $query->with($this->relations);
             }
@@ -191,10 +185,10 @@ class CrudController extends Controller
             }
 
             $model = $query->findOrFail($id);
-            
+
             // Transform the model data
             $transformedData = $this->logicHandler->transformResource($model, request());
-            
+
             return response()->json($transformedData);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -203,9 +197,7 @@ class CrudController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      * @throws ValidationException
      */
@@ -219,32 +211,32 @@ class CrudController extends Controller
                 $this->validationRules,
                 $this->logicHandler->getValidationRules($request)
             );
-            
+
             $messages = $this->logicHandler->getValidationMessages();
-            
+
             $data = $request->validate($rules, $messages);
-            
+
             // Apply custom logic before creating
             $data = $this->logicHandler->beforeCreate($data, $request);
-            
+
             $model = ($this->modelClass)::create($data);
-            
+
             // Load relationships for response
             if ($this->relations) {
                 $model->load($this->relations);
             }
-            
+
             // Apply custom logic after creating
             $this->logicHandler->afterCreate($model, $request);
-            
+
             // Transform the model data
             $transformedData = $this->logicHandler->transformResource($model, $request);
-            
+
             return response()->json($transformedData, 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'The given data was invalid.',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -253,10 +245,7 @@ class CrudController extends Controller
 
     /**
      * Update the specified resource in storage.
-     * 
-     * @param Request $request
-     * @param string $id
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      * @throws ValidationException
      */
@@ -266,38 +255,38 @@ class CrudController extends Controller
 
         try {
             $model = ($this->modelClass)::findOrFail($id);
-            
+
             // Get validation rules (base + custom logic rules)
             $rules = array_merge(
                 $this->validationRules,
                 $this->logicHandler->getValidationRules($request, $model)
             );
-            
+
             $messages = $this->logicHandler->getValidationMessages();
-            
+
             $data = $request->validate($rules, $messages);
-            
+
             // Apply custom logic before updating
             $data = $this->logicHandler->beforeUpdate($data, $model, $request);
-            
+
             $model->update($data);
-            
+
             // Load relationships for response
             if ($this->relations) {
                 $model->load($this->relations);
             }
-            
+
             // Apply custom logic after updating
             $this->logicHandler->afterUpdate($model, $request);
-            
+
             // Transform the model data
             $transformedData = $this->logicHandler->transformResource($model, $request);
-            
+
             return response()->json($transformedData);
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => 'The given data was invalid.',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -306,9 +295,7 @@ class CrudController extends Controller
 
     /**
      * Remove the specified resource from storage.
-     * 
-     * @param string $id
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function destroy(string $id): JsonResponse
@@ -317,17 +304,17 @@ class CrudController extends Controller
 
         try {
             $model = ($this->modelClass)::findOrFail($id);
-            
+
             // Check if deletion is allowed
-            if (!$this->logicHandler->beforeDelete($model, request())) {
+            if (! $this->logicHandler->beforeDelete($model, request())) {
                 return response()->json(['error' => 'This resource cannot be deleted'], 400);
             }
-            
+
             $model->delete();
-            
+
             // Apply custom logic after deleting
             $this->logicHandler->afterDelete($model, request());
-            
+
             return response()->json(null, 204);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -336,9 +323,7 @@ class CrudController extends Controller
 
     /**
      * Perform bulk operations on multiple resources.
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function bulk(Request $request): JsonResponse
@@ -347,11 +332,11 @@ class CrudController extends Controller
         $ids = $request->input('ids', []);
         $data = $request->input('data', []);
 
-        if (!in_array($operation, ['delete', 'restore', 'update', 'force_delete'])) {
+        if (! in_array($operation, ['delete', 'restore', 'update', 'force_delete'])) {
             return response()->json(['error' => 'Invalid bulk operation'], 400);
         }
 
-        $permission = match($operation) {
+        $permission = match ($operation) {
             'delete', 'force_delete' => 'delete',
             'restore', 'update' => 'edit',
             default => 'edit'
@@ -361,14 +346,14 @@ class CrudController extends Controller
 
         try {
             $query = ($this->modelClass)::whereIn('id', $ids);
-            
+
             if (in_array($operation, ['restore', 'force_delete'])) {
                 $query->withTrashed();
             }
 
             $models = $query->get();
             $affected = 0;
-            
+
             foreach ($models as $model) {
                 switch ($operation) {
                     case 'delete':
@@ -383,7 +368,7 @@ class CrudController extends Controller
                         $affected++;
                         break;
                     case 'update':
-                        if (!empty($data)) {
+                        if (! empty($data)) {
                             $processedData = $this->logicHandler->beforeUpdate($data, $model, $request);
                             $model->update($processedData);
                             $this->logicHandler->afterUpdate($model, $request);
@@ -404,7 +389,7 @@ class CrudController extends Controller
                 'message' => "Successfully processed {$affected} items",
                 'operation' => $operation,
                 'affected_count' => $affected,
-                'requested_count' => count($ids)
+                'requested_count' => count($ids),
             ]);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -413,22 +398,20 @@ class CrudController extends Controller
 
     /**
      * Get trashed (soft deleted) resources.
-     * 
-     * @param Request $request
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function trashed(Request $request): JsonResponse
     {
         $this->checkPermission('view');
 
-        if (!$this->supportsSoftDeletes()) {
+        if (! $this->supportsSoftDeletes()) {
             return response()->json(['error' => 'Soft deletes not supported for this resource'], 400);
         }
 
         try {
             $query = ($this->modelClass)::onlyTrashed();
-            
+
             if ($this->relations) {
                 $query->with($this->relations);
             }
@@ -449,23 +432,21 @@ class CrudController extends Controller
 
     /**
      * Restore a soft deleted resource.
-     * 
-     * @param string $id
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function restore(string $id): JsonResponse
     {
         $this->checkPermission('edit');
 
-        if (!$this->supportsSoftDeletes()) {
+        if (! $this->supportsSoftDeletes()) {
             return response()->json(['error' => 'Soft deletes not supported for this resource'], 400);
         }
 
         try {
             $model = ($this->modelClass)::withTrashed()->findOrFail($id);
             $model->restore();
-            
+
             return response()->json($model);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -474,29 +455,27 @@ class CrudController extends Controller
 
     /**
      * Force delete a resource (permanent deletion).
-     * 
-     * @param string $id
-     * @return JsonResponse
+     *
      * @throws UnauthorizedException
      */
     public function forceDelete(string $id): JsonResponse
     {
         $this->checkPermission('delete');
 
-        if (!$this->supportsSoftDeletes()) {
+        if (! $this->supportsSoftDeletes()) {
             return response()->json(['error' => 'Soft deletes not supported for this resource'], 400);
         }
 
         try {
             $model = ($this->modelClass)::withTrashed()->findOrFail($id);
-            
-            if (!$this->logicHandler->beforeDelete($model, request())) {
+
+            if (! $this->logicHandler->beforeDelete($model, request())) {
                 return response()->json(['error' => 'This resource cannot be permanently deleted'], 400);
             }
-            
+
             $model->forceDelete();
             $this->logicHandler->afterDelete($model, request());
-            
+
             return response()->json(null, 204);
         } catch (Throwable $e) {
             return $this->handleException($e);
@@ -505,47 +484,43 @@ class CrudController extends Controller
 
     /**
      * Generate API documentation for this resource.
-     * 
-     * @return JsonResponse
      */
     public function documentation(): JsonResponse
     {
         $crudManager = app('crud-generator');
         $resourceDocs = $crudManager->generateResourceDocumentation($this->resource, $this->config);
-        
+
         return response()->json($resourceDocs);
     }
 
     /**
      * Check if the current user has permission for the given action.
-     * 
-     * @param string $action
-     * @param bool $throwException
-     * @return bool
+     *
      * @throws UnauthorizedException
      */
     protected function checkPermission(string $action, bool $throwException = true): bool
     {
         // Skip permission check if permissions are disabled for this resource
-        if (!($this->config['permissions']['enabled'] ?? false)) {
+        if (! ($this->config['permissions']['enabled'] ?? false)) {
             return true;
         }
 
         $user = auth()->user();
-        
-        if (!$user) {
+
+        if (! $user) {
             if ($throwException) {
                 throw UnauthorizedException::forPermissions(["{$action}-{$this->resource}"]);
             }
+
             return false;
         }
 
         $permissionFormat = $this->config['permissions']['format'] ?? config('crud.permissions.format', '{action}-{resource}');
         $permission = str_replace(['{action}', '{resource}'], [$action, $this->resource], $permissionFormat);
-        
+
         $hasPermission = $user->can($permission);
 
-        if (!$hasPermission && $throwException) {
+        if (! $hasPermission && $throwException) {
             throw UnauthorizedException::forPermissions([$permission]);
         }
 
@@ -557,7 +532,7 @@ class CrudController extends Controller
      */
     protected function applySoftDeleteHandling(Builder $query, Request $request): void
     {
-        if (!$this->supportsSoftDeletes()) {
+        if (! $this->supportsSoftDeletes()) {
             return;
         }
 
@@ -574,18 +549,18 @@ class CrudController extends Controller
     protected function applySearch(Builder $query, Request $request): void
     {
         $search = $request->get('search');
-        if (!$search) {
+        if (! $search) {
             return;
         }
 
         $searchConfig = $this->config['search'] ?? [];
-        if (!($searchConfig['enabled'] ?? false)) {
+        if (! ($searchConfig['enabled'] ?? false)) {
             return;
         }
 
         $searchableFields = $searchConfig['fields'] ?? ['name', 'title', 'description'];
         $operator = $searchConfig['operator'] ?? 'like';
-        
+
         $query->where(function ($q) use ($searchableFields, $search, $operator) {
             foreach ($searchableFields as $field) {
                 if ($operator === 'like') {
@@ -603,7 +578,7 @@ class CrudController extends Controller
     protected function applyFilters(Builder $query, Request $request): void
     {
         $filters = $request->get('filter', []);
-        
+
         foreach ($filters as $field => $value) {
             if ($value !== null && $value !== '') {
                 if (is_array($value)) {
@@ -621,20 +596,20 @@ class CrudController extends Controller
     protected function applySorting(Builder $query, Request $request): void
     {
         $sortConfig = $this->config['sort'] ?? [];
-        
-        if (!($sortConfig['enabled'] ?? true)) {
+
+        if (! ($sortConfig['enabled'] ?? true)) {
             return;
         }
 
         $sort = $request->get('sort', $sortConfig['default']['field'] ?? 'created_at');
         $direction = $request->get('direction', $sortConfig['default']['direction'] ?? 'desc');
-        
-        if (!in_array($direction, ['asc', 'desc'])) {
+
+        if (! in_array($direction, ['asc', 'desc'])) {
             $direction = 'desc';
         }
 
         $sortableFields = $sortConfig['fields'] ?? ['id', 'created_at', 'updated_at'];
-        
+
         if (in_array($sort, $sortableFields)) {
             $query->orderBy($sort, $direction);
         } else {
@@ -684,7 +659,7 @@ class CrudController extends Controller
         if ($e instanceof ValidationException) {
             return response()->json([
                 'message' => 'The given data was invalid.',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         }
 
@@ -697,14 +672,12 @@ class CrudController extends Controller
             'exception' => $e->getMessage(),
             'trace' => $e->getTraceAsString(),
             'resource' => $this->resource,
-            'model' => $this->modelClass
+            'model' => $this->modelClass,
         ]);
 
         return response()->json([
             'error' => 'An error occurred while processing your request',
-            'message' => app()->environment('production') ? 'Internal server error' : $e->getMessage()
+            'message' => app()->environment('production') ? 'Internal server error' : $e->getMessage(),
         ], 500);
     }
 }
-
-

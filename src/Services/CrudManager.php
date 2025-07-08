@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Services;
 
+use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
+use AshiqueAr\LaravelCrudGenerator\Http\Controllers\CrudController;
+use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use AshiqueAr\LaravelCrudGenerator\Http\Controllers\CrudController;
-use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
-use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
 
 /**
  * Manages CRUD operations and route registration.
- * 
+ *
  * This class is responsible for registering routes, managing resource configurations,
  * and providing utilities for CRUD operations across the application.
  */
@@ -21,8 +21,8 @@ class CrudManager
     /**
      * Register all CRUD routes based on configuration.
      *
-     * @param string $prefix Route prefix (e.g., 'v1', 'api/v1')
-     * @param array<string> $middleware Array of middleware to apply to all routes
+     * @param  string  $prefix  Route prefix (e.g., 'v1', 'api/v1')
+     * @param  array<string>  $middleware  Array of middleware to apply to all routes
      */
     public function registerRoutes(string $prefix = '', array $middleware = []): void
     {
@@ -31,15 +31,20 @@ class CrudManager
         foreach ($resources as $resource => $config) {
             $this->registerResourceRoutes($resource, $config, $prefix, $middleware);
         }
+
+        // Register global documentation route
+        if (config('crud.api.documentation.enabled', true)) {
+            $this->registerGlobalDocumentationRoute($prefix, $middleware);
+        }
     }
 
     /**
      * Register routes for a specific resource.
      *
-     * @param string $resource Resource name
-     * @param array<string, mixed> $config Resource configuration
-     * @param string $prefix Route prefix
-     * @param array<string> $middleware Base middleware
+     * @param  string  $resource  Resource name
+     * @param  array<string, mixed>  $config  Resource configuration
+     * @param  string  $prefix  Route prefix
+     * @param  array<string>  $middleware  Base middleware
      */
     protected function registerResourceRoutes(string $resource, array $config, string $prefix = '', array $middleware = []): void
     {
@@ -78,9 +83,26 @@ class CrudManager
     }
 
     /**
+     * Register global documentation route.
+     *
+     * @param  string  $prefix  Route prefix
+     * @param  array<string>  $middleware  Base middleware
+     */
+    protected function registerGlobalDocumentationRoute(string $prefix = '', array $middleware = []): void
+    {
+        $routePrefix = $prefix ?: 'api';
+
+        Route::get($routePrefix.'/docs', function () {
+            $crudManager = app('crud-generator');
+
+            return response()->json($crudManager->generateApiDocumentation());
+        })->middleware($middleware)->name('crud.docs');
+    }
+
+    /**
      * Get middleware for a resource.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string>
      */
     protected function getResourceMiddleware(array $config): array
@@ -103,7 +125,7 @@ class CrudManager
     /**
      * Check if resource supports bulk operations.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      */
     protected function supportsBulkOperations(array $config): bool
     {
@@ -113,7 +135,7 @@ class CrudManager
     /**
      * Check if resource supports soft deletes.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      */
     protected function supportsSoftDeletes(array $config): bool
     {
@@ -133,7 +155,7 @@ class CrudManager
     /**
      * Get configuration for a specific resource.
      *
-     * @param string $resource Resource name
+     * @param  string  $resource  Resource name
      * @return array<string, mixed>|null
      */
     public function getResourceConfig(string $resource): ?array
@@ -144,32 +166,34 @@ class CrudManager
     /**
      * Check if a resource is configured.
      *
-     * @param string $resource Resource name
+     * @param  string  $resource  Resource name
      */
     public function hasResource(string $resource): bool
     {
-        return !is_null($this->getResourceConfig($resource));
+        return ! is_null($this->getResourceConfig($resource));
     }
 
     /**
      * Get the model class for a resource.
      *
-     * @param string $resource Resource name
+     * @param  string  $resource  Resource name
      */
     public function getResourceModel(string $resource): ?string
     {
         $config = $this->getResourceConfig($resource);
+
         return $config['model'] ?? null;
     }
 
     /**
      * Get the logic handler for a resource.
      *
-     * @param string $resource Resource name
+     * @param  string  $resource  Resource name
      */
     public function getResourceLogic(string $resource): ?string
     {
         $config = $this->getResourceConfig($resource);
+
         return $config['logic'] ?? null;
     }
 
@@ -184,14 +208,14 @@ class CrudManager
         $documentation = [
             'openapi' => '3.0.0',
             'info' => [
-                'title' => config('app.name', 'Laravel App') . ' CRUD API',
+                'title' => config('app.name', 'Laravel App').' CRUD API',
                 'version' => '1.0.0',
-                'description' => 'Auto-generated CRUD API documentation'
+                'description' => 'Auto-generated CRUD API documentation',
             ],
             'servers' => [
-                ['url' => url('/api/v1')]
+                ['url' => url('/api/v1')],
             ],
-            'paths' => []
+            'paths' => [],
         ];
 
         foreach ($resources as $resource => $config) {
@@ -207,8 +231,8 @@ class CrudManager
     /**
      * Generate OpenAPI documentation for a specific resource.
      *
-     * @param string $resource Resource name
-     * @param array<string, mixed> $config Resource configuration
+     * @param  string  $resource  Resource name
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, mixed>
      */
     protected function generateResourceDocumentation(string $resource, array $config): array
@@ -224,8 +248,8 @@ class CrudManager
                     'parameters' => $this->getListParameters($config),
                     'responses' => [
                         '200' => ['description' => 'Success'],
-                        '403' => ['description' => 'Forbidden']
-                    ]
+                        '403' => ['description' => 'Forbidden'],
+                    ],
                 ],
                 'post' => [
                     'tags' => [$resourceTitle],
@@ -233,9 +257,9 @@ class CrudManager
                     'requestBody' => $this->getCreateRequestBody($config),
                     'responses' => [
                         '201' => ['description' => 'Created'],
-                        '422' => ['description' => 'Validation Error']
-                    ]
-                ]
+                        '422' => ['description' => 'Validation Error'],
+                    ],
+                ],
             ],
             "{$basePath}/{id}" => [
                 'get' => [
@@ -246,13 +270,13 @@ class CrudManager
                             'name' => 'id',
                             'in' => 'path',
                             'required' => true,
-                            'schema' => ['type' => 'integer']
-                        ]
+                            'schema' => ['type' => 'integer'],
+                        ],
                     ],
                     'responses' => [
                         '200' => ['description' => 'Success'],
-                        '404' => ['description' => 'Not Found']
-                    ]
+                        '404' => ['description' => 'Not Found'],
+                    ],
                 ],
                 'put' => [
                     'tags' => [$resourceTitle],
@@ -262,15 +286,15 @@ class CrudManager
                             'name' => 'id',
                             'in' => 'path',
                             'required' => true,
-                            'schema' => ['type' => 'integer']
-                        ]
+                            'schema' => ['type' => 'integer'],
+                        ],
                     ],
                     'requestBody' => $this->getUpdateRequestBody($config),
                     'responses' => [
                         '200' => ['description' => 'Updated'],
                         '404' => ['description' => 'Not Found'],
-                        '422' => ['description' => 'Validation Error']
-                    ]
+                        '422' => ['description' => 'Validation Error'],
+                    ],
                 ],
                 'delete' => [
                     'tags' => [$resourceTitle],
@@ -280,15 +304,15 @@ class CrudManager
                             'name' => 'id',
                             'in' => 'path',
                             'required' => true,
-                            'schema' => ['type' => 'integer']
-                        ]
+                            'schema' => ['type' => 'integer'],
+                        ],
                     ],
                     'responses' => [
                         '204' => ['description' => 'Deleted'],
-                        '404' => ['description' => 'Not Found']
-                    ]
-                ]
-            ]
+                        '404' => ['description' => 'Not Found'],
+                    ],
+                ],
+            ],
         ];
 
         return $paths;
@@ -297,7 +321,7 @@ class CrudManager
     /**
      * Get parameters for list endpoint.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<array<string, mixed>>
      */
     protected function getListParameters(array $config): array
@@ -306,20 +330,20 @@ class CrudManager
             [
                 'name' => 'page',
                 'in' => 'query',
-                'schema' => ['type' => 'integer', 'default' => 1]
+                'schema' => ['type' => 'integer', 'default' => 1],
             ],
             [
                 'name' => 'per_page',
                 'in' => 'query',
-                'schema' => ['type' => 'integer', 'default' => 15]
-            ]
+                'schema' => ['type' => 'integer', 'default' => 15],
+            ],
         ];
 
         if ($config['search']['enabled'] ?? false) {
             $parameters[] = [
                 'name' => 'search',
                 'in' => 'query',
-                'schema' => ['type' => 'string']
+                'schema' => ['type' => 'string'],
             ];
         }
 
@@ -327,12 +351,12 @@ class CrudManager
             $parameters[] = [
                 'name' => 'sort',
                 'in' => 'query',
-                'schema' => ['type' => 'string']
+                'schema' => ['type' => 'string'],
             ];
             $parameters[] = [
                 'name' => 'direction',
                 'in' => 'query',
-                'schema' => ['type' => 'string', 'enum' => ['asc', 'desc']]
+                'schema' => ['type' => 'string', 'enum' => ['asc', 'desc']],
             ];
         }
 
@@ -342,7 +366,7 @@ class CrudManager
     /**
      * Get request body for create endpoint.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, mixed>
      */
     protected function getCreateRequestBody(array $config): array
@@ -353,17 +377,17 @@ class CrudManager
                 'application/json' => [
                     'schema' => [
                         'type' => 'object',
-                        'properties' => $this->getFieldProperties($config)
-                    ]
-                ]
-            ]
+                        'properties' => $this->getFieldProperties($config),
+                    ],
+                ],
+            ],
         ];
     }
 
     /**
      * Get request body for update endpoint.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, mixed>
      */
     protected function getUpdateRequestBody(array $config): array
@@ -374,7 +398,7 @@ class CrudManager
     /**
      * Get field properties from config.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, array<string, string>>
      */
     protected function getFieldProperties(array $config): array
@@ -392,17 +416,17 @@ class CrudManager
     /**
      * Validate a resource configuration.
      *
-     * @param array<string, mixed> $config Resource configuration
-     * @return bool
+     * @param  array<string, mixed>  $config  Resource configuration
+     *
      * @throws \AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException
      */
     public function validateResourceConfig(array $config): bool
     {
-        if (!isset($config['model'])) {
+        if (! isset($config['model'])) {
             throw new CrudException('Model class is required in resource configuration');
         }
 
-        if (!class_exists($config['model'])) {
+        if (! class_exists($config['model'])) {
             throw new CrudException("Model class does not exist: {$config['model']}");
         }
 
@@ -412,7 +436,7 @@ class CrudManager
     /**
      * Merge configuration with default values.
      *
-     * @param array<string, mixed> $config Resource configuration
+     * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, mixed>
      */
     public function mergeWithDefaults(array $config): array
@@ -449,12 +473,12 @@ class CrudManager
     /**
      * Check if a resource exists in configuration.
      *
-     * @param string $resource Resource name
-     * @return bool
+     * @param  string  $resource  Resource name
      */
     public function resourceExists(string $resource): bool
     {
         $resources = config('crud.resources', []);
+
         return isset($resources[$resource]);
     }
 
@@ -466,26 +490,26 @@ class CrudManager
     public function getAllResourceNames(): array
     {
         $resources = config('crud.resources', []);
+
         return array_keys($resources);
     }
 
     /**
      * Create a logic instance for a resource.
      *
-     * @param string $resource Resource name
+     * @param  string  $resource  Resource name
      * @return \AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic
+     *
      * @throws \AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException
      */
     public function createLogicInstance(string $resource)
     {
         $config = $this->getResourceConfig($resource);
-        
+
         if (isset($config['logic']) && class_exists($config['logic'])) {
             return app($config['logic']);
         }
-        
+
         return app(BaseCrudLogic::class);
     }
 }
-
-

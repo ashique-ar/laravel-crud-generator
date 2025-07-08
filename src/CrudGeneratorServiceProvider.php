@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Route;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\GenerateCrudPermissions;
+use AshiqueAr\LaravelCrudGenerator\Console\Commands\InstallCrudGenerator;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\MakeCrudLogic;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\MakeCrudResource;
-use AshiqueAr\LaravelCrudGenerator\Console\Commands\InstallCrudGenerator;
 use AshiqueAr\LaravelCrudGenerator\Http\Middleware\CheckCrudPermission;
 use AshiqueAr\LaravelCrudGenerator\Services\CrudManager;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
 
 /**
  * Service Provider for Laravel CRUD Generator Package
- * 
+ *
  * Bootstraps the package by registering services, middleware, commands,
  * and publishing configuration files.
- * 
- * @package AshiqueAr\LaravelCrudGenerator
  */
 class CrudGeneratorServiceProvider extends ServiceProvider
 {
@@ -29,11 +27,11 @@ class CrudGeneratorServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Merge package configuration
-        $this->mergeConfigFrom(__DIR__ . '/../config/crud.php', 'crud');
+        $this->mergeConfigFrom(__DIR__.'/../config/crud.php', 'crud');
 
         // Register singleton for CRUD manager
         $this->app->singleton('crud-generator', function ($app) {
-            return new CrudManager();
+            return new CrudManager;
         });
 
         // Bind the CRUD manager to the container
@@ -66,7 +64,7 @@ class CrudGeneratorServiceProvider extends ServiceProvider
     protected function registerMiddleware(): void
     {
         $router = $this->app['router'];
-        
+
         $router->aliasMiddleware('check.crud.permission', CheckCrudPermission::class);
     }
 
@@ -102,18 +100,18 @@ class CrudGeneratorServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             // Publish configuration file
             $this->publishes([
-                __DIR__ . '/../config/crud.php' => config_path('crud.php'),
+                __DIR__.'/../config/crud.php' => config_path('crud.php'),
             ], 'crud-config');
 
             // Publish stub files
             $this->publishes([
-                __DIR__ . '/../resources/stubs' => resource_path('stubs'),
+                __DIR__.'/../resources/stubs' => resource_path('stubs'),
             ], 'crud-stubs');
 
             // Publish all assets
             $this->publishes([
-                __DIR__ . '/../config/crud.php' => config_path('crud.php'),
-                __DIR__ . '/../resources/stubs' => resource_path('stubs'),
+                __DIR__.'/../config/crud.php' => config_path('crud.php'),
+                __DIR__.'/../resources/stubs' => resource_path('stubs'),
             ], 'crud-generator');
         }
     }
@@ -131,5 +129,3 @@ class CrudGeneratorServiceProvider extends ServiceProvider
         ];
     }
 }
-
-

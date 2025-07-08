@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests\Factories;
 
-use Illuminate\Database\Eloquent\Factories\Factory;
 use AshiqueAr\LaravelCrudGenerator\Tests\Models\TestUser;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * Factory for TestUser model.
@@ -27,5 +27,3 @@ class TestUserFactory extends Factory
         ];
     }
 }
-
-

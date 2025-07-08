@@ -8,7 +8,7 @@ use Exception;
 
 /**
  * General CRUD operation exception.
- * 
+ *
  * This exception is thrown when CRUD operations encounter errors
  * such as invalid configurations, missing resources, or business logic violations.
  */
@@ -16,10 +16,6 @@ class CrudException extends Exception
 {
     /**
      * Create a new CRUD exception instance.
-     *
-     * @param string $message
-     * @param int $code
-     * @param Exception|null $previous
      */
     public function __construct(string $message = 'CRUD operation failed', int $code = 0, ?Exception $previous = null)
     {
@@ -58,5 +54,3 @@ class CrudException extends Exception
         return new static($message);
     }
 }
-
-

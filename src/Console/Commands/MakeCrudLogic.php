@@ -43,30 +43,27 @@ class MakeCrudLogic extends GeneratorCommand
 
     /**
      * Get the stub file for the generator.
-     *
-     * @return string
      */
     protected function getStub(): string
     {
-        return __DIR__ . '/../../../resources/stubs/crud-logic.stub';
+        return __DIR__.'/../../../resources/stubs/crud-logic.stub';
     }
 
     /**
      * Get the default namespace for the class.
      *
-     * @param string $rootNamespace
-     * @return string
+     * @param  string  $rootNamespace
      */
     protected function getDefaultNamespace($rootNamespace): string
     {
-        return $rootNamespace . '\Services\Crud';
+        return $rootNamespace.'\Services\Crud';
     }
 
     /**
      * Build the class with the given name.
      *
-     * @param string $name
-     * @return string
+     * @param  string  $name
+     *
      * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
      */
     protected function buildClass($name): string
@@ -82,14 +79,11 @@ class MakeCrudLogic extends GeneratorCommand
 
     /**
      * Replace the model variable in the stub.
-     *
-     * @param string $stub
-     * @return string
      */
     protected function replaceModel(string $stub): string
     {
         $model = $this->option('model');
-        
+
         if ($model) {
             $modelVariable = Str::camel(class_basename($model));
             $stub = str_replace('{{ modelVariable }}', $modelVariable, $stub);
@@ -104,15 +98,13 @@ class MakeCrudLogic extends GeneratorCommand
 
     /**
      * Replace the model class in the stub.
-     *
-     * @param string $stub
-     * @return string
      */
     protected function replaceModelClass(string $stub): string
     {
+        /** @var string|null $model */
         $model = $this->option('model');
-        
-        if ($model) {
+
+        if ($model && is_string($model)) {
             // If the model contains backslashes, it's already a fully qualified namespace
             if (str_contains($model, '\\')) {
                 $modelNamespace = $model;
@@ -120,9 +112,9 @@ class MakeCrudLogic extends GeneratorCommand
             } else {
                 // If it's just a class name, assume it's in App\Models
                 $modelClass = $model;
-                $modelNamespace = 'App\\Models\\' . $modelClass;
+                $modelNamespace = 'App\\Models\\'.$modelClass;
             }
-            
+
             $stub = str_replace('{{ modelClass }}', $modelClass, $stub);
             $stub = str_replace('{{modelClass}}', $modelClass, $stub);
             $stub = str_replace('{{ modelNamespace }}', $modelNamespace, $stub);
@@ -139,35 +131,32 @@ class MakeCrudLogic extends GeneratorCommand
 
     /**
      * Execute the console command.
-     *
-     * @return int
      */
-    public function handle(): int
+    public function handle(): ?bool
     {
         $result = parent::handle();
 
         if ($result === false) {
-            return Command::FAILURE;
+            return false;
         }
 
         $name = $this->qualifyClass($this->getNameInput());
+        /** @var string|null $model */
         $model = $this->option('model');
 
         $this->info("CRUD logic class created: {$name}");
-        
-        if ($model) {
+
+        if ($model && is_string($model)) {
             $this->info("Associated with model: {$model}");
             $this->newLine();
             $this->line('<options=bold>Next steps:</>');
-            $this->line("1. Register this logic class in <comment>config/crud.php</comment>");
-            $this->line("2. Customize the logic methods as needed");
-            $this->line("3. Test your CRUD operations");
+            $this->line('1. Register this logic class in <comment>config/crud.php</comment>');
+            $this->line('2. Customize the logic methods as needed');
+            $this->line('3. Test your CRUD operations');
         } else {
             $this->warn('No model specified. Remember to update the class with your model.');
         }
 
-        return Command::SUCCESS;
+        return true;
     }
 }
-
-

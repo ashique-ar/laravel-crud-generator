@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Middleware to check CRUD permissions for API endpoints.
- * 
+ *
  * This middleware automatically determines the required permission
  * based on the HTTP method and route pattern, then checks if the
  * authenticated user has the necessary permission.
@@ -21,16 +21,13 @@ class CheckCrudPermission
     /**
      * Handle an incoming request.
      *
-     * @param Request $request
-     * @param Closure $next
-     * @return Response
      * @throws UnauthorizedException
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        
-        if (!$user) {
+
+        if (! $user) {
             throw UnauthorizedException::notLoggedIn();
         }
 
@@ -38,13 +35,13 @@ class CheckCrudPermission
         $resource = $this->getResourceFromRoute($request);
         $action = $this->getActionFromRequest($request);
 
-        if (!$resource || !$action) {
+        if (! $resource || ! $action) {
             return $next($request);
         }
 
         // Check if permissions are enabled for this resource
         $resourceConfig = config("crud.resources.{$resource}");
-        if (!($resourceConfig['permissions']['enabled'] ?? false)) {
+        if (! ($resourceConfig['permissions']['enabled'] ?? false)) {
             return $next($request);
         }
 
@@ -63,7 +60,7 @@ class CheckCrudPermission
         );
 
         // Check permission
-        if (!$user->can($permission)) {
+        if (! $user->can($permission)) {
             throw UnauthorizedException::forPermissions([$permission]);
         }
 
@@ -76,14 +73,14 @@ class CheckCrudPermission
     protected function getResourceFromRoute(Request $request): ?string
     {
         $route = $request->route();
-        
-        if (!$route) {
+
+        if (! $route) {
             return null;
         }
 
         // Try to get resource from route parameter
         $resource = $route->parameter('resource');
-        
+
         if ($resource) {
             return $resource;
         }
@@ -120,7 +117,7 @@ class CheckCrudPermission
         if ($routeName && str_contains($routeName, 'crud.')) {
             $parts = explode('.', $routeName);
             $action = end($parts);
-            
+
             return match ($action) {
                 'index' => 'view',
                 'show' => 'view',
@@ -154,11 +151,11 @@ class CheckCrudPermission
         if (str_contains($uri, '/trashed')) {
             return 'view';
         }
-        
+
         if (str_contains($uri, '/docs')) {
             return 'view';
         }
-        
+
         // Both index and show use 'view' permission
         return 'view';
     }
@@ -171,11 +168,11 @@ class CheckCrudPermission
         if (str_contains($uri, '/bulk')) {
             return $this->getBulkAction($request);
         }
-        
+
         if (str_contains($uri, '/restore')) {
             return 'edit';
         }
-        
+
         return 'create';
     }
 
@@ -195,7 +192,7 @@ class CheckCrudPermission
         if (str_contains($uri, '/force')) {
             return 'force-delete';
         }
-        
+
         return 'delete';
     }
 
@@ -205,7 +202,7 @@ class CheckCrudPermission
     protected function getBulkAction(Request $request): string
     {
         $operation = $request->input('operation');
-        
+
         return match ($operation) {
             'delete', 'force_delete' => 'delete',
             'restore', 'update' => 'edit',
@@ -219,7 +216,7 @@ class CheckCrudPermission
     protected function isShowRoute(string $uri): bool
     {
         // Check if URI ends with an ID parameter pattern
-        return preg_match('/\/\{[^}]+\}$/', $uri) || 
+        return preg_match('/\/\{[^}]+\}$/', $uri) ||
                preg_match('/\/[0-9]+$/', $uri);
     }
 
@@ -230,11 +227,10 @@ class CheckCrudPermission
     {
         // Remove query parameters and check if it's a clean resource URI
         $cleanUri = explode('?', $uri)[0];
-        return !$this->isShowRoute($cleanUri) && 
-               !str_contains($cleanUri, '/bulk') && 
-               !str_contains($cleanUri, '/trashed') &&
-               !str_contains($cleanUri, '/docs');
+
+        return ! $this->isShowRoute($cleanUri) &&
+               ! str_contains($cleanUri, '/bulk') &&
+               ! str_contains($cleanUri, '/trashed') &&
+               ! str_contains($cleanUri, '/docs');
     }
 }
-
-

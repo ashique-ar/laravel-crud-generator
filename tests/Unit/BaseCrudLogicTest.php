@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
-use Illuminate\Http\Request;
 use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
-use AshiqueAr\LaravelCrudGenerator\Exceptions\CrudException;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Unit tests for BaseCrudLogic service.
@@ -19,7 +17,7 @@ class BaseCrudLogicTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->logic = new BaseCrudLogic();
+        $this->logic = new BaseCrudLogic;
         $this->logic->setModelClass('TestModel');
     }
 
@@ -88,5 +86,3 @@ class BaseCrudLogicTest extends TestCase
         $this->assertEmpty($messages);
     }
 }
-
-

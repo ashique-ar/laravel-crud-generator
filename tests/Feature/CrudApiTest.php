@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace AshiqueAr\LaravelCrudGenerator\Tests\Feature;
 
+use AshiqueAr\LaravelCrudGenerator\CrudGeneratorServiceProvider;
+use AshiqueAr\LaravelCrudGenerator\Tests\Models\TestUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Orchestra\Testbench\TestCase;
-use AshiqueAr\LaravelCrudGenerator\CrudGeneratorServiceProvider;
-use AshiqueAr\LaravelCrudGenerator\Tests\Models\TestUser;
 
 /**
  * Feature tests for CRUD API endpoints.
@@ -66,7 +66,7 @@ class CrudApiTest extends TestCase
 
     protected function setUpDatabase(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
     }
 
     public function test_can_list_resources(): void
@@ -79,14 +79,14 @@ class CrudApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure([
                 'data' => [
-                    '*' => ['id', 'name', 'email', 'created_at', 'updated_at']
+                    '*' => ['id', 'name', 'email', 'created_at', 'updated_at'],
                 ],
                 'meta' => [
                     'current_page',
                     'last_page',
                     'per_page',
                     'total',
-                ]
+                ],
             ]);
 
         $this->assertCount(5, $response->json('data'));
@@ -103,7 +103,7 @@ class CrudApiTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJsonStructure([
-                'data' => ['id', 'name', 'email', 'created_at', 'updated_at']
+                'data' => ['id', 'name', 'email', 'created_at', 'updated_at'],
             ]);
 
         $this->assertDatabaseHas('test_users', [
@@ -128,14 +128,14 @@ class CrudApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'data' => ['id', 'name', 'email', 'created_at', 'updated_at']
+                'data' => ['id', 'name', 'email', 'created_at', 'updated_at'],
             ])
             ->assertJson([
                 'data' => [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                ]
+                ],
             ]);
     }
 
@@ -158,7 +158,7 @@ class CrudApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'data' => ['id', 'name', 'email', 'created_at', 'updated_at']
+                'data' => ['id', 'name', 'email', 'created_at', 'updated_at'],
             ]);
 
         $this->assertDatabaseHas('test_users', [
@@ -190,7 +190,7 @@ class CrudApiTest extends TestCase
         $response = $this->getJson('/api/crud/test_users?search=John');
 
         $response->assertStatus(200);
-        
+
         $names = collect($response->json('data'))->pluck('name')->toArray();
         $this->assertContains('John Doe', $names);
         $this->assertContains('Bob Johnson', $names);
@@ -206,7 +206,7 @@ class CrudApiTest extends TestCase
         $response = $this->getJson('/api/crud/test_users?sort=name&direction=asc');
 
         $response->assertStatus(200);
-        
+
         $names = collect($response->json('data'))->pluck('name')->toArray();
         $this->assertEquals(['Alice', 'Bob', 'Charlie'], $names);
     }
@@ -220,7 +220,7 @@ class CrudApiTest extends TestCase
         $response = $this->getJson('/api/crud/test_users?filter[name]=Doe');
 
         $response->assertStatus(200);
-        
+
         $names = collect($response->json('data'))->pluck('name')->toArray();
         $this->assertContains('John Doe', $names);
         $this->assertContains('Jane Doe', $names);
@@ -239,7 +239,7 @@ class CrudApiTest extends TestCase
                     'current_page' => 2,
                     'per_page' => 10,
                     'total' => 25,
-                ]
+                ],
             ]);
 
         $this->assertCount(10, $response->json('data'));
@@ -255,9 +255,7 @@ class CrudApiTest extends TestCase
             ->assertJson([
                 'meta' => [
                     'per_page' => 100, // Should be limited to max_per_page
-                ]
+                ],
             ]);
     }
 }
-
-
