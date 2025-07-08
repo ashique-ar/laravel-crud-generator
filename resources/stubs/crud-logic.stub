@@ -21,157 +21,146 @@ class {{ class }} extends BaseCrudLogic
      *
      * @return string
      */
-    protected function getModelClass(): string
+    public function getModelClass(): string
     {
         return {{ modelClass }}::class;
     }
 
     /**
-     * Customize the query before applying filters and pagination.
-     * This is called for both index and search operations.
+     * Apply custom query modifications before listing resources.
      *
      * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param array $filters
+     * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Database\Eloquent\Builder
      */
-    protected function customizeQuery($query, array $filters = [])
+    public function beforeIndex(\Illuminate\Database\Eloquent\Builder $query, \Illuminate\Http\Request $request): \Illuminate\Database\Eloquent\Builder
     {
         // Add custom query modifications here
         // Example: $query->with(['relation'])->where('status', 'active');
         
-        return parent::customizeQuery($query, $filters);
+        return parent::beforeIndex($query, $request);
     }
 
     /**
      * Customize data before creating a new record.
      *
      * @param array $data
+     * @param \Illuminate\Http\Request $request
      * @return array
      */
-    protected function beforeCreate(array $data): array
+    public function beforeCreate(array $data, \Illuminate\Http\Request $request): array
     {
         // Add custom logic before creating
         // Example: $data['created_by'] = auth()->id();
         
-        return parent::beforeCreate($data);
+        return parent::beforeCreate($data, $request);
     }
 
     /**
      * Customize the model after creation.
      *
      * @param {{ modelClass }} ${{ modelVariable }}
-     * @param array $data
-     * @return {{ modelClass }}
+     * @param \Illuminate\Http\Request $request
+     * @return void
      */
-    protected function afterCreate(${{ modelVariable }}, array $data)
+    public function afterCreate(${{ modelVariable }}, \Illuminate\Http\Request $request): void
     {
         // Add custom logic after creating
         // Example: $this->sendNotification(${{ modelVariable }});
         
-        return parent::afterCreate(${{ modelVariable }}, $data);
+        parent::afterCreate(${{ modelVariable }}, $request);
     }
 
     /**
      * Customize data before updating a record.
      *
-     * @param {{ modelClass }} ${{ modelVariable }}
      * @param array $data
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @param \Illuminate\Http\Request $request
      * @return array
      */
-    protected function beforeUpdate(${{ modelVariable }}, array $data): array
+    public function beforeUpdate(array $data, ${{ modelVariable }}, \Illuminate\Http\Request $request): array
     {
         // Add custom logic before updating
         // Example: $data['updated_by'] = auth()->id();
         
-        return parent::beforeUpdate(${{ modelVariable }}, $data);
+        return parent::beforeUpdate($data, ${{ modelVariable }}, $request);
     }
 
     /**
      * Customize the model after update.
      *
      * @param {{ modelClass }} ${{ modelVariable }}
-     * @param array $data
-     * @return {{ modelClass }}
+     * @param \Illuminate\Http\Request $request
+     * @return void
      */
-    protected function afterUpdate(${{ modelVariable }}, array $data)
+    public function afterUpdate(${{ modelVariable }}, \Illuminate\Http\Request $request): void
     {
         // Add custom logic after updating
         // Example: $this->clearCache(${{ modelVariable }});
         
-        return parent::afterUpdate(${{ modelVariable }}, $data);
+        parent::afterUpdate(${{ modelVariable }}, $request);
     }
 
     /**
      * Customize logic before deleting a record.
      *
      * @param {{ modelClass }} ${{ modelVariable }}
-     * @return void
-     * @throws \Exception
+     * @param \Illuminate\Http\Request $request
+     * @return bool
      */
-    protected function beforeDelete(${{ modelVariable }}): void
+    public function beforeDelete(${{ modelVariable }}, \Illuminate\Http\Request $request): bool
     {
         // Add custom logic before deleting
-        // Example: if (${{ modelVariable }}->hasRelatedRecords()) throw new Exception('Cannot delete');
+        // Example: if (${{ modelVariable }}->hasRelatedRecords()) return false;
         
-        parent::beforeDelete(${{ modelVariable }});
+        return parent::beforeDelete(${{ modelVariable }}, $request);
     }
 
     /**
      * Customize logic after deleting a record.
      *
      * @param {{ modelClass }} ${{ modelVariable }}
+     * @param \Illuminate\Http\Request $request
      * @return void
      */
-    protected function afterDelete(${{ modelVariable }}): void
+    public function afterDelete(${{ modelVariable }}, \Illuminate\Http\Request $request): void
     {
         // Add custom logic after deleting
         // Example: $this->cleanupFiles(${{ modelVariable }});
         
-        parent::afterDelete(${{ modelVariable }});
+        parent::afterDelete(${{ modelVariable }}, $request);
     }
 
     /**
-     * Define custom validation rules for creating records.
+     * Get additional validation rules for this resource.
      *
-     * @param array $data
-     * @return array
-     */
-    protected function getCreateValidationRules(array $data): array
-    {
-        return [
-            // Add your create validation rules here
-            // Example: 'name' => 'required|string|max:255',
-        ];
-    }
-
-    /**
-     * Define custom validation rules for updating records.
-     *
-     * @param {{ modelClass }} ${{ modelVariable }}
-     * @param array $data
-     * @return array
-     */
-    protected function getUpdateValidationRules(${{ modelVariable }}, array $data): array
-    {
-        return [
-            // Add your update validation rules here
-            // Example: 'name' => 'required|string|max:255',
-        ];
-    }
-
-    /**
-     * Define custom authorization logic.
-     *
-     * @param string $action (create, read, update, delete)
+     * @param \Illuminate\Http\Request $request
      * @param {{ modelClass }}|null ${{ modelVariable }}
+     * @return array
+     */
+    public function getValidationRules(\Illuminate\Http\Request $request, ${{ modelVariable }} = null): array
+    {
+        return [
+            // Add your validation rules here
+            // Example: 'name' => 'required|string|max:255',
+        ];
+    }
+
+    /**
+     * Apply custom authorization logic beyond permissions.
+     *
+     * @param string $action The action being performed (view, create, edit, delete)
+     * @param {{ modelClass }}|null ${{ modelVariable }} The model being accessed (null for index/create)
+     * @param \Illuminate\Http\Request $request
      * @return bool
      */
-    protected function authorize(string $action, ${{ modelVariable }} = null): bool
+    public function authorize(string $action, ${{ modelVariable }} = null, \Illuminate\Http\Request $request): bool
     {
         // Add custom authorization logic here
         // Example: return auth()->user()->can($action . '-{{ modelVariable }}s', ${{ modelVariable }});
         
-        return parent::authorize($action, ${{ modelVariable }});
+        return parent::authorize($action, ${{ modelVariable }}, $request);
     }
 }
 
