@@ -36,8 +36,7 @@ class MakeCrudResource extends Command
      */
     protected $description = 'Create a new CRUD resource configuration';
 
-    /*     */
-    public function handle():      *
+    /* 
      * @return int
      */
     public function handle(): int
