@@ -24,7 +24,7 @@ class MakeCrudLogic extends GeneratorCommand
      */
     protected $signature = 'make:crud-logic
                             {name : The name of the CRUD logic class}
-                            {--model= : The model class to associate with this logic}
+                            {--model= : The model class (e.g., User, User\\Profile, App\\Models\\Admin\\User)}
                             {--force : Overwrite existing file}';
 
     /**
@@ -113,8 +113,15 @@ class MakeCrudLogic extends GeneratorCommand
         $model = $this->option('model');
         
         if ($model) {
-            $modelClass = class_basename($model);
-            $modelNamespace = 'App\Models\\' . $modelClass;
+            // If the model contains backslashes, it's already a fully qualified namespace
+            if (str_contains($model, '\\')) {
+                $modelNamespace = $model;
+                $modelClass = class_basename($model);
+            } else {
+                // If it's just a class name, assume it's in App\Models
+                $modelClass = $model;
+                $modelNamespace = 'App\\Models\\' . $modelClass;
+            }
             
             $stub = str_replace('{{ modelClass }}', $modelClass, $stub);
             $stub = str_replace('{{modelClass}}', $modelClass, $stub);

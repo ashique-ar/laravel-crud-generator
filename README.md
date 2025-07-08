@@ -79,6 +79,16 @@ return [
                 'enabled' => true,
                 'middleware' => 'check.crud.permission'
             ]
+        ],
+        
+        // Example with model in subfolder
+        'user-profiles' => [
+            'model' => App\Models\User\Profile::class,
+            'fillable' => ['bio', 'avatar', 'social_links'],
+            'validation' => [
+                'bio' => 'nullable|string|max:1000',
+                'avatar' => 'nullable|image|max:2048'
+            ]
         ]
     ]
 ];
@@ -156,12 +166,65 @@ For each configured resource, the following endpoints are automatically generate
 
 ## 🔧 Advanced Usage
 
+### Model Namespacing
+
+The package supports flexible model namespacing to accommodate different project structures:
+
+```php
+// Configuration examples for different model locations
+'resources' => [
+    // Simple model in App\Models
+    'users' => [
+        'model' => App\Models\User::class,
+        // ... other config
+    ],
+    
+    // Model in subfolder
+    'profiles' => [
+        'model' => App\Models\User\Profile::class,
+        // ... other config
+    ],
+    
+    // Model in admin subfolder
+    'admin-users' => [
+        'model' => App\Models\Admin\User::class,
+        // ... other config
+    ],
+    
+    // Model in completely different namespace
+    'products' => [
+        'model' => Modules\Catalog\Models\Product::class,
+        // ... other config
+    ]
+]
+```
+
+When using artisan commands, you can specify models in several ways:
+
+```bash
+# Simple class name (assumes App\Models namespace)
+php artisan make:crud-logic UserLogic --model=User
+
+# With subfolder (within App\Models)
+php artisan make:crud-logic ProfileLogic --model=User\\Profile
+
+# Full namespace
+php artisan make:crud-logic ProductLogic --model=Modules\\Catalog\\Models\\Product
+```
+
 ### Custom Logic Handlers
 
 Create custom business logic for your resources:
 
 ```bash
+# For a simple model in App\Models
 php artisan make:crud-logic UserLogic --model=User
+
+# For a model in a subfolder
+php artisan make:crud-logic ProfileLogic --model=User\\Profile
+
+# For a model with full namespace
+php artisan make:crud-logic AdminLogic --model=App\\Models\\Admin\\User
 ```
 
 This generates:
@@ -209,7 +272,14 @@ Then update your configuration:
 Use the artisan command to quickly add new resources:
 
 ```bash
+# For a simple model in App\Models
 php artisan make:crud-resource posts --model=Post
+
+# For a model in a subfolder
+php artisan make:crud-resource user-profiles --model=User\\Profile
+
+# For a model with full namespace
+php artisan make:crud-resource admin-users --model=App\\Models\\Admin\\User
 ```
 
 This will interactively help you configure:

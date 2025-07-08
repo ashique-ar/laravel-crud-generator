@@ -23,7 +23,7 @@ class MakeCrudResource extends Command
      */
     protected $signature = 'make:crud-resource
                             {name : The name of the resource (e.g., posts, users)}
-                            {--model= : The model class name}
+                            {--model= : The model class (e.g., User, User\\Profile, App\\Models\\Admin\\User)}
                             {--logic : Generate a custom logic class}
                             {--resource : Generate an API resource class}
                             {--permissions : Generate permissions for this resource}
