@@ -24,7 +24,7 @@ A powerful, configuration-driven CRUD API generator for Laravel applications. Ge
 ## 📋 Requirements
 
 - PHP 8.1+
-- Laravel 10.x | 11.x
+- Laravel 10.x | 11.x | 12.x
 - Spatie Laravel Permission (automatically installed)
 
 ## 📦 Installation
