@@ -101,13 +101,16 @@ class MakeCrudResource extends Command
         }
 
         $config = include $configPath;
-        
+
         if (isset($config['resources'][$name]) && !$this->option('force')) {
             if (!$this->confirm("Resource '{$name}' already exists. Overwrite?")) {
                 $this->warn('Skipped resource configuration.');
+
                 return;
             }
         }
+
+        $addNewResourceTo = $config['add_new_resource_to'] ?? 'bottom';
 
         $resourceConfig = [
             'model' => $this->getFullModelNamespace($model),
@@ -129,16 +132,33 @@ class MakeCrudResource extends Command
 
         // Read the config file content
         $content = File::get($configPath);
-        
+
         // Find the resources array and add the new resource
-        $resourcesPattern = '/(\s+)(\'resources\'\s*=>\s*\[)(.*?)(\n\s+\],)/s';
-        
+        $resourcesPattern = "/(\s*)('resources'\s*=>\s*\[)(.*?)(\n\s*\])/s";
+
         if (preg_match($resourcesPattern, $content, $matches)) {
             $indent = $matches[1];
             $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
-            $newResourcesContent = $matches[2] . $matches[3] . "\n" . $resourceEntry . $matches[4];
-            $content = preg_replace($resourcesPattern, $newResourcesContent, $content);
-            
+
+            $existingResources = trim($matches[3]);
+            $newResourcesContent = $matches[2]; // 'resources' => [
+
+            if ($addNewResourceTo === 'top') {
+                $newResourcesContent .= "\n" . $resourceEntry;
+                if (!empty($existingResources)) {
+                    $newResourcesContent .= "\n" . $existingResources;
+                }
+            } else {
+                if (!empty($existingResources)) {
+                    $newResourcesContent .= "\n" . $existingResources;
+                }
+                $newResourcesContent .= "\n" . $resourceEntry;
+            }
+
+            $newResourcesContent .= $matches[4]; // \n];
+
+            $content = str_replace($matches[0], $newResourcesContent, $content);
+
             File::put($configPath, $content);
             $this->info("✓ Added resource '{$name}' to configuration");
         } else {

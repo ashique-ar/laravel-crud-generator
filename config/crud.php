@@ -178,4 +178,17 @@ return [
         //     'permissions' => ['enabled' => true],
         // ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Add New Resource To
+    |--------------------------------------------------------------------------
+    |
+    | This setting determines where the `make:crud-resource` command will
+    | add new resources within the 'resources' array.
+    |
+    | Supported values: 'top', 'bottom'.
+    |
+    */
+    'add_new_resource_to' => 'bottom',
 ];
