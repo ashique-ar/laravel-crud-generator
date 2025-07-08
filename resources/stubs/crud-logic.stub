@@ -1,0 +1,178 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ modelNamespace }};
+use AshiqueAr\LaravelCrudGenerator\Services\Crud\BaseCrudLogic;
+
+/**
+ * Custom CRUD logic for {{ modelClass }} model.
+ *
+ * This class extends the base CRUD logic to provide custom behavior
+ * for {{ modelClass }} operations. You can override any of the base
+ * methods to implement specific business logic.
+ */
+class {{ class }} extends BaseCrudLogic
+{
+    /**
+     * Get the model class this logic handles.
+     *
+     * @return string
+     */
+    protected function getModelClass(): string
+    {
+        return {{ modelClass }}::class;
+    }
+
+    /**
+     * Customize the query before applying filters and pagination.
+     * This is called for both index and search operations.
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array $filters
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    protected function customizeQuery($query, array $filters = [])
+    {
+        // Add custom query modifications here
+        // Example: $query->with(['relation'])->where('status', 'active');
+        
+        return parent::customizeQuery($query, $filters);
+    }
+
+    /**
+     * Customize data before creating a new record.
+     *
+     * @param array $data
+     * @return array
+     */
+    protected function beforeCreate(array $data): array
+    {
+        // Add custom logic before creating
+        // Example: $data['created_by'] = auth()->id();
+        
+        return parent::beforeCreate($data);
+    }
+
+    /**
+     * Customize the model after creation.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @param array $data
+     * @return {{ modelClass }}
+     */
+    protected function afterCreate(${{ modelVariable }}, array $data)
+    {
+        // Add custom logic after creating
+        // Example: $this->sendNotification(${{ modelVariable }});
+        
+        return parent::afterCreate(${{ modelVariable }}, $data);
+    }
+
+    /**
+     * Customize data before updating a record.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @param array $data
+     * @return array
+     */
+    protected function beforeUpdate(${{ modelVariable }}, array $data): array
+    {
+        // Add custom logic before updating
+        // Example: $data['updated_by'] = auth()->id();
+        
+        return parent::beforeUpdate(${{ modelVariable }}, $data);
+    }
+
+    /**
+     * Customize the model after update.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @param array $data
+     * @return {{ modelClass }}
+     */
+    protected function afterUpdate(${{ modelVariable }}, array $data)
+    {
+        // Add custom logic after updating
+        // Example: $this->clearCache(${{ modelVariable }});
+        
+        return parent::afterUpdate(${{ modelVariable }}, $data);
+    }
+
+    /**
+     * Customize logic before deleting a record.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @return void
+     * @throws \Exception
+     */
+    protected function beforeDelete(${{ modelVariable }}): void
+    {
+        // Add custom logic before deleting
+        // Example: if (${{ modelVariable }}->hasRelatedRecords()) throw new Exception('Cannot delete');
+        
+        parent::beforeDelete(${{ modelVariable }});
+    }
+
+    /**
+     * Customize logic after deleting a record.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @return void
+     */
+    protected function afterDelete(${{ modelVariable }}): void
+    {
+        // Add custom logic after deleting
+        // Example: $this->cleanupFiles(${{ modelVariable }});
+        
+        parent::afterDelete(${{ modelVariable }});
+    }
+
+    /**
+     * Define custom validation rules for creating records.
+     *
+     * @param array $data
+     * @return array
+     */
+    protected function getCreateValidationRules(array $data): array
+    {
+        return [
+            // Add your create validation rules here
+            // Example: 'name' => 'required|string|max:255',
+        ];
+    }
+
+    /**
+     * Define custom validation rules for updating records.
+     *
+     * @param {{ modelClass }} ${{ modelVariable }}
+     * @param array $data
+     * @return array
+     */
+    protected function getUpdateValidationRules(${{ modelVariable }}, array $data): array
+    {
+        return [
+            // Add your update validation rules here
+            // Example: 'name' => 'required|string|max:255',
+        ];
+    }
+
+    /**
+     * Define custom authorization logic.
+     *
+     * @param string $action (create, read, update, delete)
+     * @param {{ modelClass }}|null ${{ modelVariable }}
+     * @return bool
+     */
+    protected function authorize(string $action, ${{ modelVariable }} = null): bool
+    {
+        // Add custom authorization logic here
+        // Example: return auth()->user()->can($action . '-{{ modelVariable }}s', ${{ modelVariable }});
+        
+        return parent::authorize($action, ${{ modelVariable }});
+    }
+}
+
+
