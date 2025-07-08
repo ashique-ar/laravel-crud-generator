@@ -92,7 +92,8 @@ class CrudController extends Controller
     protected function initializeFromConfig(): void
     {
         $this->modelClass = $this->config['model'];
-        $this->validationRules = $this->config['validation'] ?? [];
+        // Support both 'validation' (legacy) and 'rules' (new structure)
+        $this->validationRules = $this->config['validation'] ?? $this->config['rules'] ?? [];
         $this->relations = $this->config['relations'] ?? [];
 
         // Initialize custom logic handler if configured
@@ -207,10 +208,9 @@ class CrudController extends Controller
 
         try {
             // Get validation rules (base + custom logic rules)
-            $rules = array_merge(
-                $this->validationRules,
-                $this->logicHandler->getValidationRules($request)
-            );
+            $baseRules = $this->getValidationRulesForOperation('store');
+            $customRules = $this->logicHandler->getValidationRules($request);
+            $rules = array_merge($baseRules, $customRules);
 
             $messages = $this->logicHandler->getValidationMessages();
 
@@ -257,10 +257,9 @@ class CrudController extends Controller
             $model = ($this->modelClass)::findOrFail($id);
 
             // Get validation rules (base + custom logic rules)
-            $rules = array_merge(
-                $this->validationRules,
-                $this->logicHandler->getValidationRules($request, $model)
-            );
+            $baseRules = $this->getValidationRulesForOperation('update', $model);
+            $customRules = $this->logicHandler->getValidationRules($request, $model);
+            $rules = array_merge($baseRules, $customRules);
 
             $messages = $this->logicHandler->getValidationMessages();
 
@@ -679,5 +678,53 @@ class CrudController extends Controller
             'error' => 'An error occurred while processing your request',
             'message' => app()->environment('production') ? 'Internal server error' : $e->getMessage(),
         ], 500);
+    }
+
+    /**
+     * Get validation rules for a specific operation.
+     *
+     * @param string $operation The operation type ('store' or 'update')
+     * @param Model|null $model The model instance for update operations
+     * @return array The validation rules
+     */
+    protected function getValidationRulesForOperation(string $operation, ?Model $model = null): array
+    {
+        // Support new 'rules' structure with store/update sections
+        if (isset($this->validationRules[$operation])) {
+            $rules = $this->validationRules[$operation];
+            
+            // Replace placeholders in validation rules
+            if ($model && $operation === 'update') {
+                $rules = $this->replacePlaceholdersInRules($rules, $model);
+            }
+            
+            return $rules;
+        }
+        
+        // Fallback to old 'validation' structure (legacy support)
+        return $this->validationRules;
+    }
+
+    /**
+     * Replace placeholders in validation rules.
+     *
+     * @param array $rules The validation rules
+     * @param Model $model The model instance
+     * @return array The rules with placeholders replaced
+     */
+    protected function replacePlaceholdersInRules(array $rules, Model $model): array
+    {
+        $replacements = [
+            '{{id}}' => $model->getKey(),
+            '{{user_id}}' => auth()->id() ?? 0,
+            '{{resource}}' => $this->resource,
+        ];
+
+        $rulesJson = json_encode($rules);
+        foreach ($replacements as $placeholder => $value) {
+            $rulesJson = str_replace($placeholder, (string) $value, $rulesJson);
+        }
+
+        return json_decode($rulesJson, true);
     }
 }

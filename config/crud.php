@@ -116,9 +116,15 @@ return [
     |     'logic' => App\Services\Crud\UserLogic::class,
     |     'fillable' => ['name', 'email', 'phone'],
     |     'hidden' => ['password'],
-    |     'validation' => [
-    |         'name' => 'required|string|max:255',
-    |         'email' => 'required|email|unique:users,email',
+    |     'rules' => [
+    |         'store' => [
+    |             'name' => 'required|string|max:255',
+    |             'email' => 'required|email|unique:users,email',
+    |         ],
+    |         'update' => [
+    |             'name' => 'sometimes|string|max:255',
+    |             'email' => 'sometimes|email|unique:users,email,{{id}}',
+    |         ]
     |     ],
     |     'search' => [
     |         'enabled' => true,
@@ -155,9 +161,15 @@ return [
         // 'users' => [
         //     'model' => App\Models\User::class,
         //     'fillable' => ['name', 'email'],
-        //     'validation' => [
-        //         'name' => 'required|string|max:255',
-        //         'email' => 'required|email|unique:users,email',
+        //     'rules' => [
+        //         'store' => [
+        //             'name' => 'required|string|max:255',
+        //             'email' => 'required|email|unique:users,email',
+        //         ],
+        //         'update' => [
+        //             'name' => 'sometimes|string|max:255', 
+        //             'email' => 'sometimes|email|unique:users,email,{{id}}',
+        //         ]
         //     ],
         //     'search' => [
         //         'enabled' => true,

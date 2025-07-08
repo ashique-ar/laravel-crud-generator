@@ -57,37 +57,119 @@ Edit `config/crud.php` to define your resources:
 <?php
 
 return [
+    // ... other configuration sections ...
+    
     'resources' => [
         'users' => [
             'model' => App\Models\User::class,
+            'table' => 'users',
             'fillable' => ['name', 'email', 'phone'],
-            'validation' => [
-                'name' => 'required|string|max:255',
-                'email' => 'required|email|unique:users,email',
-                'phone' => 'nullable|string|max:20'
+            'hidden' => ['password'],
+            'rules' => [
+                'store' => [
+                    'name' => 'required|string|max:255',
+                    'email' => 'required|email|unique:users,email',
+                    'phone' => 'nullable|string|max:20'
+                ],
+                'update' => [
+                    'name' => 'sometimes|string|max:255',
+                    'email' => 'sometimes|email|unique:users,email,{{id}}',
+                    'phone' => 'sometimes|string|max:20'
+                ]
             ],
             'search' => [
                 'enabled' => true,
-                'fields' => ['name', 'email']
+                'fields' => ['name', 'email'],
+                'operator' => 'like'
             ],
             'sort' => [
                 'enabled' => true,
                 'fields' => ['name', 'email', 'created_at'],
                 'default' => ['field' => 'created_at', 'direction' => 'desc']
             ],
+            'filters' => [
+                'enabled' => true,
+                'fields' => ['status', 'role'],
+                'operators' => [
+                    'status' => 'exact',
+                    'role' => 'in'
+                ]
+            ],
+            'relations' => ['profile', 'roles'],
             'permissions' => [
                 'enabled' => true,
                 'middleware' => 'check.crud.permission'
-            ]
+            ],
+            'soft_deletes' => true,
+            'bulk_operations' => [
+                'enabled' => true,
+                'operations' => ['delete', 'restore', 'update']
+            ],
+            'api' => [
+                'paginate' => true,
+                'per_page' => 15,
+                'max_per_page' => 100
+            ],
+            'middleware' => ['auth:sanctum']
         ],
         
         // Example with model in subfolder
         'user-profiles' => [
             'model' => App\Models\User\Profile::class,
             'fillable' => ['bio', 'avatar', 'social_links'],
-            'validation' => [
-                'bio' => 'nullable|string|max:1000',
-                'avatar' => 'nullable|image|max:2048'
+            'rules' => [
+                'store' => [
+                    'bio' => 'nullable|string|max:1000',
+                    'avatar' => 'nullable|image|max:2048'
+                ],
+                'update' => [
+                    'bio' => 'sometimes|string|max:1000',
+                    'avatar' => 'sometimes|image|max:2048'
+                ]
+            ],
+            'search' => [
+                'enabled' => true,
+                'fields' => ['bio']
+            ]
+        ],
+        
+        // Example with full custom namespace
+        'vehicle-classes' => [
+            'model' => App\Models\Vehicle\VehicleClass::class,
+            'table' => 'vehicle_classes',
+            'fillable' => ['name', 'description', 'is_active'],
+            'rules' => [
+                'store' => [
+                    'name' => 'required|string|max:255|unique:vehicle_classes,name',
+                    'description' => 'nullable|string|max:1000',
+                    'is_active' => 'boolean',
+                ],
+                'update' => [
+                    'name' => 'sometimes|string|max:255|unique:vehicle_classes,name,{{id}}',
+                    'description' => 'sometimes|string|max:1000',
+                    'is_active' => 'sometimes|boolean',
+                ]
+            ],
+            'search' => [
+                'enabled' => true,
+                'fields' => ['name', 'description'],
+                'operator' => 'like'
+            ],
+            'sort' => [
+                'enabled' => true,
+                'fields' => ['name', 'created_at'],
+                'default' => ['field' => 'name', 'direction' => 'asc']
+            ],
+            'filters' => [
+                'enabled' => true,
+                'fields' => ['is_active'],
+                'operators' => [
+                    'is_active' => 'exact'
+                ]
+            ],
+            'bulk_operations' => [
+                'enabled' => true,
+                'operations' => ['delete', 'update']
             ]
         ]
     ]
@@ -273,7 +355,19 @@ Then update your configuration:
 
 ```php
 'users' => [
+    'model' => App\Models\User::class,
     'logic' => App\Services\Crud\UserLogic::class,
+    'fillable' => ['name', 'email', 'created_by'],
+    'rules' => [
+        'store' => [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email'
+        ],
+        'update' => [
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,{{id}}'
+        ]
+    ],
     // ... other configuration
 ]
 ```
@@ -360,6 +454,182 @@ GET /api/v1/users/docs
 ```
 
 Returns OpenAPI 3.0 compatible JSON that can be used with Swagger UI or similar tools.
+
+## 📝 Configuration
+
+The package uses a comprehensive configuration system in `config/crud.php`. Here's a complete reference:
+
+### Global Configuration
+
+```php
+<?php
+
+return [
+    // API defaults applied to all resources
+    'api' => [
+        'pagination' => [
+            'enabled' => true,
+            'per_page' => 15,
+            'max_per_page' => 100,
+        ],
+        'documentation' => [
+            'enabled' => true,
+            'title' => 'CRUD API Documentation',
+            'version' => '1.0.0',
+        ],
+        'response' => [
+            'include_timestamps' => true,
+            'include_meta' => true,
+        ],
+    ],
+
+    // Permission settings (uses Spatie Laravel Permission)
+    'permissions' => [
+        'enabled' => true,
+        'guard' => 'web',
+        'format' => '{action}-{resource}',
+        'actions' => ['view', 'create', 'edit', 'delete'],
+        'super_admin_role' => 'super-admin',
+    ],
+
+    // Global middleware for all routes
+    'middleware' => [
+        // 'auth:api',
+        // 'throttle:60,1',
+    ],
+
+    // Search configuration defaults
+    'search' => [
+        'default_operator' => 'like',
+        'case_sensitive' => false,
+        'operators' => [
+            'like' => 'LIKE',
+            'exact' => '=',
+            'not_equal' => '!=',
+            'greater_than' => '>',
+            'less_than' => '<',
+            'greater_equal' => '>=',
+            'less_equal' => '<=',
+            'in' => 'IN',
+            'not_in' => 'NOT IN',
+            'between' => 'BETWEEN',
+            'starts_with' => 'LIKE',
+            'ends_with' => 'LIKE',
+        ],
+    ],
+
+    // Resource definitions
+    'resources' => [
+        // Your resources here...
+    ]
+];
+```
+
+### Resource Configuration Options
+
+Each resource supports the following configuration options:
+
+```php
+'resource_name' => [
+    // Required: The Eloquent model class
+    'model' => App\Models\YourModel::class,
+    
+    // Optional: Database table name (auto-detected if not provided)
+    'table' => 'your_table',
+    
+    // Optional: Custom logic class for business logic
+    'logic' => App\Services\Crud\YourModelLogic::class,
+    
+    // Mass assignment protection - fields that can be filled
+    'fillable' => ['field1', 'field2', 'field3'],
+    
+    // Fields to hide in API responses
+    'hidden' => ['password', 'secret_key'],
+    
+    // Validation rules for different operations
+    'rules' => [
+        'store' => [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+        ],
+        'update' => [
+            'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,{{id}}',
+        ]
+    ],
+    
+    // Search configuration
+    'search' => [
+        'enabled' => true,
+        'fields' => ['name', 'email', 'description'],
+        'operator' => 'like' // default operator for this resource
+    ],
+    
+    // Sorting configuration
+    'sort' => [
+        'enabled' => true,
+        'fields' => ['name', 'created_at', 'updated_at'],
+        'default' => ['field' => 'created_at', 'direction' => 'desc']
+    ],
+    
+    // Filtering configuration
+    'filters' => [
+        'enabled' => true,
+        'fields' => ['status', 'category_id', 'is_active'],
+        'operators' => [
+            'status' => 'exact',
+            'category_id' => 'in',
+            'is_active' => 'exact'
+        ]
+    ],
+    
+    // Relationships to eager load
+    'relations' => ['category', 'tags', 'author'],
+    
+    // Permission settings for this resource
+    'permissions' => [
+        'enabled' => true,
+        'middleware' => 'check.crud.permission'
+    ],
+    
+    // Soft deletes support
+    'soft_deletes' => true, // Set to true if model uses SoftDeletes trait
+    
+    // Bulk operations configuration
+    'bulk_operations' => [
+        'enabled' => true,
+        'operations' => ['delete', 'restore', 'update'] // Available operations
+    ],
+    
+    // API-specific settings for this resource
+    'api' => [
+        'paginate' => true,
+        'per_page' => 20,      // Override global default
+        'max_per_page' => 50   // Override global default
+    ],
+    
+    // Additional middleware for this resource only
+    'middleware' => ['auth:sanctum', 'role:admin']
+],
+```
+
+### Validation Rule Placeholders
+
+In validation rules, you can use placeholders that will be replaced during validation:
+
+- `{{id}}` - The ID of the current resource (useful for unique rules in updates)
+- `{{user_id}}` - The ID of the authenticated user
+- `{{resource}}` - The name of the current resource
+
+Example:
+```php
+'rules' => [
+    'update' => [
+        'email' => 'required|email|unique:users,email,{{id}}',
+        'slug' => 'required|string|unique:posts,slug,{{id}}'
+    ]
+]
+```
 
 ## 🧪 Testing
 
