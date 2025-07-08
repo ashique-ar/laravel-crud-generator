@@ -73,19 +73,20 @@ class MakeCrudLogic extends GeneratorCommand
     {
         $stub = $this->files->get($this->getStub());
 
-        return $this->replaceNamespace($stub, $name)
-            ->replaceClass($stub, $name)
-            ->replaceModel($stub)
-            ->replaceModelClass($stub);
+        $stub = $this->replaceNamespace($stub, $name)->replaceClass($stub, $name);
+        $stub = $this->replaceModel($stub);
+        $stub = $this->replaceModelClass($stub);
+
+        return $stub;
     }
 
     /**
      * Replace the model variable in the stub.
      *
      * @param string $stub
-     * @return $this
+     * @return string
      */
-    protected function replaceModel(string &$stub): static
+    protected function replaceModel(string $stub): string
     {
         $model = $this->option('model');
         
@@ -98,16 +99,16 @@ class MakeCrudLogic extends GeneratorCommand
             $stub = str_replace('{{modelVariable}}', 'model', $stub);
         }
 
-        return $this;
+        return $stub;
     }
 
     /**
      * Replace the model class in the stub.
      *
      * @param string $stub
-     * @return $this
+     * @return string
      */
-    protected function replaceModelClass(string &$stub): static
+    protected function replaceModelClass(string $stub): string
     {
         $model = $this->option('model');
         
@@ -126,7 +127,7 @@ class MakeCrudLogic extends GeneratorCommand
             $stub = str_replace('{{modelNamespace}}', 'Illuminate\Database\Eloquent\Model', $stub);
         }
 
-        return $this;
+        return $stub;
     }
 
     /**
