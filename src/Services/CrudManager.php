@@ -56,28 +56,28 @@ class CrudManager
             'middleware' => $routeMiddleware,
         ], function () use ($resource, $config) {
             // Standard CRUD routes
-            Route::get('/', [CrudController::class, 'index'])->name("crud.{$resource}.index");
-            Route::post('/', [CrudController::class, 'store'])->name("crud.{$resource}.store");
-            Route::get('/{id}', [CrudController::class, 'show'])->name("crud.{$resource}.show");
-            Route::put('/{id}', [CrudController::class, 'update'])->name("crud.{$resource}.update");
-            Route::patch('/{id}', [CrudController::class, 'update'])->name("crud.{$resource}.patch");
-            Route::delete('/{id}', [CrudController::class, 'destroy'])->name("crud.{$resource}.destroy");
+            Route::get('/', [CrudController::class, 'index'])->name("crud.{$resource}.index")->defaults('resource', $resource);
+            Route::post('/', [CrudController::class, 'store'])->name("crud.{$resource}.store")->defaults('resource', $resource);
+            Route::get('/{id}', [CrudController::class, 'show'])->name("crud.{$resource}.show")->defaults('resource', $resource);
+            Route::put('/{id}', [CrudController::class, 'update'])->name("crud.{$resource}.update")->defaults('resource', $resource);
+            Route::patch('/{id}', [CrudController::class, 'update'])->name("crud.{$resource}.patch")->defaults('resource', $resource);
+            Route::delete('/{id}', [CrudController::class, 'destroy'])->name("crud.{$resource}.destroy")->defaults('resource', $resource);
 
             // Bulk operations
             if ($this->supportsBulkOperations($config)) {
-                Route::post('/bulk', [CrudController::class, 'bulk'])->name("crud.{$resource}.bulk");
+                Route::post('/bulk', [CrudController::class, 'bulk'])->name("crud.{$resource}.bulk")->defaults('resource', $resource);
             }
 
             // Soft delete routes
             if ($this->supportsSoftDeletes($config)) {
-                Route::get('/trashed', [CrudController::class, 'trashed'])->name("crud.{$resource}.trashed");
-                Route::post('/{id}/restore', [CrudController::class, 'restore'])->name("crud.{$resource}.restore");
-                Route::delete('/{id}/force', [CrudController::class, 'forceDelete'])->name("crud.{$resource}.force-delete");
+                Route::get('/trashed', [CrudController::class, 'trashed'])->name("crud.{$resource}.trashed")->defaults('resource', $resource);
+                Route::post('/{id}/restore', [CrudController::class, 'restore'])->name("crud.{$resource}.restore")->defaults('resource', $resource);
+                Route::delete('/{id}/force', [CrudController::class, 'forceDelete'])->name("crud.{$resource}.force-delete")->defaults('resource', $resource);
             }
 
             // Documentation route
             if (config('crud.api.documentation.enabled', true)) {
-                Route::get('/docs', [CrudController::class, 'documentation'])->name("crud.{$resource}.docs");
+                Route::get('/docs', [CrudController::class, 'documentation'])->name("crud.{$resource}.docs")->defaults('resource', $resource);
             }
         });
     }
@@ -205,15 +205,23 @@ class CrudManager
     public function generateApiDocumentation(): array
     {
         $resources = $this->getResources();
+        // Load documentation settings from config/crud.php
+        $docConfig = config('crud.api.documentation', []);
+        $openapi     = $docConfig['openapi']     ?? '3.0.0';
+        $title       = $docConfig['title']       ?? (config('app.name', 'Laravel App').' CRUD API');
+        $version     = $docConfig['version']     ?? '1.0.0';
+        $description = $docConfig['description'] ?? 'Auto-generated CRUD API documentation';
+        $baseUrl     = $docConfig['base_url']    ?? url('/');
+
         $documentation = [
-            'openapi' => '3.0.0',
+            'openapi' => $openapi,
             'info' => [
-                'title' => config('app.name', 'Laravel App').' CRUD API',
-                'version' => '1.0.0',
-                'description' => 'Auto-generated CRUD API documentation',
+                'title'       => $title,
+                'version'     => $version,
+                'description' => $description,
             ],
             'servers' => [
-                ['url' => url('/api/v1')],
+                ['url' => $baseUrl],
             ],
             'paths' => [],
         ];
@@ -235,7 +243,7 @@ class CrudManager
      * @param  array<string, mixed>  $config  Resource configuration
      * @return array<string, mixed>
      */
-    protected function generateResourceDocumentation(string $resource, array $config): array
+    public function generateResourceDocumentation(string $resource, array $config): array
     {
         $resourceTitle = Str::title(str_replace('-', ' ', $resource));
         $basePath = "/{$resource}";

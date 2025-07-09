@@ -70,19 +70,22 @@ class CrudController extends Controller
      */
     public function __construct()
     {
-        $route = request()->route();
-        $this->resource = $route ? $route->parameter('resource') : '';
-
-        if (! $this->resource) {
-            throw new CrudException('Resource parameter not found in route');
+        // Skip initialization when running in console (e.g., php artisan route:list)
+        if (app()->runningInConsole()) {
+            return;
         }
-
+        // Attempt HTTP context initialization
+        $route = request()->route();
+        $this->resource = $route ? (string) $route->parameter('resource') : '';
+        // Only proceed if a resource parameter is present
+        if (! $this->resource) {
+            return;
+        }
+        // Load resource config
         $this->config = config("crud.resources.{$this->resource}");
-
         if (! $this->config) {
             throw new CrudException("Resource '{$this->resource}' not configured in crud.php");
         }
-
         $this->initializeFromConfig();
     }
 

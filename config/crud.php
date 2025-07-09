@@ -31,9 +31,17 @@ return [
         ],
 
         'documentation' => [
+            // OpenAPI version
+            'openapi' => '3.0.0',
+            // Enable or disable API documentation endpoints
             'enabled' => true,
+            // Documentation title and version
             'title' => 'CRUD API Documentation',
             'version' => '1.0.0',
+            // Optional description for the API docs
+            'description' => 'Auto-generated CRUD API documentation',
+            // Base URL for servers (e.g., '/api/v1')
+            'base_url' => url('/api/v1'),
         ],
 
         'response' => [
