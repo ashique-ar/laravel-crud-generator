@@ -7,6 +7,7 @@ namespace AshiqueAr\LaravelCrudGenerator\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 /**
  * Make CRUD resource command.
@@ -161,12 +162,26 @@ class MakeCrudResource extends Command
      */
     protected function writeConfig(string $path, array $config): void
     {
-        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($config, true) . ";\n";
+        $exportedConfig = var_export($config, true);
+
+        // Replace old array syntax with modern short syntax
+        $exportedConfig = preg_replace("/^array\s\(/m", '[', $exportedConfig);
+        $exportedConfig = preg_replace("/\)$/", ']', $exportedConfig);
+        $exportedConfig = preg_replace("/\s=>\sarray\s\(/", ' => [', $exportedConfig);
+        $exportedConfig = preg_replace("/\),/m", '],', $exportedConfig);
+
+        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . $exportedConfig . ";\n";
         File::put($path, $content);
 
         // Format the file using Laravel Pint for better readability
-        if (File::exists(base_path('vendor/bin/pint'))) {
-            $this->callSilently('pint', ['path' => $path]);
+        $pintPath = base_path('vendor/bin/pint');
+        if (File::exists($pintPath)) {
+            try {
+                $process = new Process([$pintPath, $path]);
+                $process->run();
+            } catch (\Exception $e) {
+                $this->warn('Failed to format config file with Pint: ' . $e->getMessage());
+            }
         }
     }
 
