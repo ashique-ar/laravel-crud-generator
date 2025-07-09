@@ -41,7 +41,8 @@ return [
             // Optional description for the API docs
             'description' => 'Auto-generated CRUD API documentation',
             // Base URL for servers (e.g., '/api/v1')
-            'base_url' => url('/api/v1'),
+            // Use string to avoid executing url() helper during config load
+            'base_url' => '/api/v1',
         ],
 
         'response' => [

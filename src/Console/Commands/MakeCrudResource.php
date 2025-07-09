@@ -130,75 +130,44 @@ class MakeCrudResource extends Command
             'soft_deletes' => false,
         ];
 
-        // Read config file content
+        // Read the config file content
         $content = File::get($configPath);
-        // Find the top-level 'resources' array
-        $search = "'resources' => [";
-        $pos = strpos($content, $search);
-        if ($pos === false) {
-            $this->error("Resources array not found in configuration. Please add resource manually.");
-            $this->showResourceManualAddition($name, $resourceConfig);
-            return;
-        }
-        // Determine indent by capturing whitespace before 'resources'
-        $lineStart = strrpos(substr($content, 0, $pos), "\n") + 1;
-        $line = substr($content, $lineStart, $pos - $lineStart);
-        preg_match('/^(\s*)/', $line, $m);
-        $baseIndent = $m[1] ?? '';
-        // Locate matching closing bracket for resources array
-        $posOpen = strpos($content, '[', $pos);
-        $depth = 1;
-        $len = strlen($content);
-        for ($i = $posOpen + 1; $i < $len; $i++) {
-            if ($content[$i] === '[') {
-                $depth++;
-            } elseif ($content[$i] === ']') {
-                $depth--;
-                if ($depth === 0) {
-                    $posClose = $i;
-                    break;
+
+        // This regex is designed to be more robust.
+        // It looks for 'resources' => [ and finds its corresponding closing ],
+        // by looking for the last '],' before the next top-level array key.
+        $resourcesPattern = "/('resources'\s*=>\s*\[)(.*?)(\n\s*\],(?=\s*'\w+'\s*=>))/s";
+
+        if (preg_match($resourcesPattern, $content, $matches)) {
+            $indent = '    '; // Standard indent for config arrays
+            $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
+
+            $existingResources = trim($matches[2]);
+            $newResourcesContent = $matches[1]; // 'resources' => [
+
+            if ($addNewResourceTo === 'top') {
+                $newResourcesContent .= "\n" . $resourceEntry;
+                if (!empty($existingResources)) {
+                    // Add a comma if there are existing resources
+                    $newResourcesContent .= ",\n" . $existingResources;
                 }
-            }
-        }
-        if (!isset($posClose)) {
-            $this->error("Could not find end of resources array.");
-            $this->showResourceManualAddition($name, $resourceConfig);
-            return;
-        }
-        // Generate resource entry with correct indent
-        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $baseIndent . '    ');
-        // Insert before closing bracket
-        $newContent = substr($content, 0, $posClose)
-            . "\n" . $resourceEntry . "\n"
-            . substr($content, $posClose);
-        File::put($configPath, $newContent);
-        $this->info("✓ Added resource '{$name}' to configuration");
-        return;
-    }
-    
-    /**
-     * Show instructions for manually adding a resource.
-     *
-     * @param string $name
-     * @param array $resourceConfig
-     */
-    protected function showResourceManualAddition(string $name, array $resourceConfig): void
-    {
-        // Show the generated resource entry for manual addition
-        $this->line("\nPlease add the following resource manually to your config/crud.php file:");
-        $this->line("\n'" . $name . "' => [");
-        foreach ($resourceConfig as $key => $value) {
-            if (is_array($value) && empty($value)) {
-                $this->line("    '" . $key . "' => [],");
-            } elseif (is_string($value)) {
-                $this->line("    '" . $key . "' => '" . $value . "',");
-            } elseif (is_bool($value)) {
-                $this->line("    '" . $key . "' => " . ($value ? 'true' : 'false') . ",");
             } else {
-                $this->line("    '" . $key . "' => " . var_export($value, true) . ",");
+                if (!empty($existingResources)) {
+                    $newResourcesContent .= "\n" . $existingResources . ",";
+                }
+                $newResourcesContent .= "\n" . $resourceEntry;
             }
+
+            $newResourcesContent .= $matches[3]; // \n    ],
+
+            // Replace the old resources block with the new one
+            $content = preg_replace($resourcesPattern, addcslashes($newResourcesContent, '\\$'), $content, 1);
+
+            File::put($configPath, $content);
+            $this->info("✓ Added resource '{$name}' to configuration");
+        } else {
+            $this->warn("Could not automatically update configuration. Please add the resource manually.");
         }
-        $this->line("],");
     }
 
     /**
@@ -217,7 +186,21 @@ class MakeCrudResource extends Command
             $entry .= "{$indent}    '{$key}' => ";
             
             if (is_array($value)) {
-                $entry .= $this->formatArrayValue($value, $indent . '    ');
+                if (empty($value)) {
+                    $entry .= "[]";
+                } else {
+                    $entry .= "[\n";
+                    foreach ($value as $subKey => $subValue) {
+                        if (is_string($subKey)) {
+                            $entry .= "{$indent}        '{$subKey}' => ";
+                            $entry .= is_array($subValue) ? '[]' : var_export($subValue, true);
+                            $entry .= ",\n";
+                        } else {
+                            $entry .= "{$indent}        " . var_export($subValue, true) . ",\n";
+                        }
+                    }
+                    $entry .= "{$indent}    ]";
+                }
             } elseif (is_string($value)) {
                 $entry .= "'{$value}'";
             } elseif (is_bool($value)) {
@@ -232,46 +215,6 @@ class MakeCrudResource extends Command
         $entry .= "{$indent}],";
         
         return $entry;
-    }
-    
-    /**
-     * Format an array value recursively.
-     *
-     * @param array $array
-     * @param string $indent
-     * @return string
-     */
-    protected function formatArrayValue(array $array, string $indent): string
-    {
-        if (empty($array)) {
-            return '[]';
-        }
-        
-        $result = "[\n";
-        
-        foreach ($array as $key => $value) {
-            $result .= $indent . '    ';
-            
-            if (is_string($key)) {
-                $result .= "'{$key}' => ";
-            }
-            
-            if (is_array($value)) {
-                $result .= $this->formatArrayValue($value, $indent . '    ');
-            } elseif (is_string($value)) {
-                $result .= "'{$value}'";
-            } elseif (is_bool($value)) {
-                $result .= $value ? 'true' : 'false';
-            } else {
-                $result .= var_export($value, true);
-            }
-            
-            $result .= ",\n";
-        }
-        
-        $result .= "{$indent}]";
-        
-        return $result;
     }
 
     /**

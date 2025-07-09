@@ -36,32 +36,32 @@ class CrudController extends Controller
     /**
      * The fully qualified class name of the model.
      */
-    protected string $modelClass;
+    protected string $modelClass = '';
 
     /**
      * Validation rules for operations.
      */
-    protected array $validationRules;
+    protected array $validationRules = [];
 
     /**
      * Relationships to eager load.
      */
-    protected array $relations;
+    protected array $relations = [];
 
     /**
      * Custom logic handler instance.
      */
-    protected ?BaseCrudLogic $logicHandler;
+    protected ?BaseCrudLogic $logicHandler = null;
 
     /**
      * Resource name from route parameter.
      */
-    protected string $resource;
+    protected string $resource = '';
 
     /**
      * Resource configuration from crud.php.
      */
-    protected array $config;
+    protected array $config = [];
 
     /**
      * Initialize the controller based on the route resource parameter.
@@ -70,22 +70,38 @@ class CrudController extends Controller
      */
     public function __construct()
     {
-        // Skip initialization when running in console (e.g., php artisan route:list)
+        // Initialize default values for typed properties
+        $this->modelClass = '';
+        $this->config = [];
+        $this->validationRules = [];
+        $this->relations = [];
+        $this->logicHandler = null;
+        $this->resource = '';
+
+        // Skip initialization when running in console (e.g., artisan commands)
         if (app()->runningInConsole()) {
             return;
         }
-        // Attempt HTTP context initialization
+
+        // Determine resource from route parameter or default
         $route = request()->route();
-        $this->resource = $route ? (string) $route->parameter('resource') : '';
-        // Only proceed if a resource parameter is present
-        if (! $this->resource) {
+        $resource = '';
+        if ($route) {
+            $resource = (string) ($route->parameter('resource') ?? ($route->defaults['resource'] ?? '')); 
+        }
+        if (! $resource) {
+            // No resource specified, skip initialization
             return;
         }
-        // Load resource config
-        $this->config = config("crud.resources.{$this->resource}");
-        if (! $this->config) {
+        $this->resource = $resource;
+
+        // Load resource configuration
+        $config = config("crud.resources.{$this->resource}");
+        if (! is_array($config) || ! $config) {
             throw new CrudException("Resource '{$this->resource}' not configured in crud.php");
         }
+        $this->config = $config;
+
         $this->initializeFromConfig();
     }
 
