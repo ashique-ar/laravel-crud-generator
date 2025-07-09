@@ -30,6 +30,9 @@ return [
             'max_per_page' => 100,
         ],
 
+        // Route prefix for CRUD API endpoints
+        'prefix' => 'api/crud',
+
         'documentation' => [
             // OpenAPI version
             'openapi' => '3.0.0',
