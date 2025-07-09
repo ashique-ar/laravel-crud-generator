@@ -241,10 +241,10 @@ class CrudManager
         // Load documentation settings from config/crud.php
         $docConfig = $this->getConfig('crud.api.documentation', []);
         $openapi     = $docConfig['openapi']     ?? '3.0.0';
-        $title       = $docConfig['title']       ?? (config('app.name', 'Laravel App').' CRUD API');
+        $title       = $docConfig['title']       ?? ($this->getConfig('app.name', 'Laravel App').' CRUD API');
         $version     = $docConfig['version']     ?? '1.0.0';
         $description = $docConfig['description'] ?? 'Auto-generated CRUD API documentation';
-        $baseUrl     = $docConfig['base_url']    ?? url('/');
+        $baseUrl     = $docConfig['base_url']    ?? '/';
 
         $documentation = [
             'openapi' => $openapi,
