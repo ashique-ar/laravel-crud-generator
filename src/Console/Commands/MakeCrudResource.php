@@ -97,10 +97,11 @@ class MakeCrudResource extends Command
 
         if (!File::exists($configPath)) {
             $this->error('CRUD configuration file not found. Run php artisan crud:install first.');
+
             return;
         }
 
-        $config = include $configPath;
+        $config = require $configPath;
 
         if (isset($config['resources'][$name]) && !$this->option('force')) {
             if (!$this->confirm("Resource '{$name}' already exists. Overwrite?")) {
@@ -130,87 +131,43 @@ class MakeCrudResource extends Command
             'soft_deletes' => false,
         ];
 
-        // Read the config file content
-        $content = File::get($configPath);
+        // Create the new resource entry
+        $newEntry = [$name => $resourceConfig];
 
-        // Find the resources array and add the new resource
-        $resourcesPattern = "/(\s*)('resources'\s*=>\s*\[)(.*?)(\n\s*\])/s";
-
-        if (preg_match($resourcesPattern, $content, $matches)) {
-            $indent = $matches[1];
-            $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
-
-            $existingResources = trim($matches[3]);
-            $newResourcesContent = $matches[2]; // 'resources' => [
-
-            if ($addNewResourceTo === 'top') {
-                $newResourcesContent .= "\n" . $resourceEntry;
-                if (!empty($existingResources)) {
-                    $newResourcesContent .= "\n" . $existingResources;
-                }
-            } else {
-                if (!empty($existingResources)) {
-                    $newResourcesContent .= "\n" . $existingResources;
-                }
-                $newResourcesContent .= "\n" . $resourceEntry;
-            }
-
-            $newResourcesContent .= $matches[4]; // \n];
-
-            $content = str_replace($matches[0], $newResourcesContent, $content);
-
-            File::put($configPath, $content);
-            $this->info("✓ Added resource '{$name}' to configuration");
-        } else {
-            $this->warn("Could not automatically update configuration. Please add the resource manually.");
+        // Get existing resources, removing the old entry if it exists (for overwrite)
+        $existingResources = $config['resources'] ?? [];
+        if (isset($existingResources[$name])) {
+            unset($existingResources[$name]);
         }
+
+        // Add the new entry to the top or bottom
+        if ($addNewResourceTo === 'top') {
+            $config['resources'] = $newEntry + $existingResources;
+        } else {
+            $config['resources'] = $existingResources + $newEntry;
+        }
+
+        // Write the updated configuration back to the file
+        $this->writeConfig($configPath, $config);
+
+        $this->info("✓ Added resource '{$name}' to configuration");
     }
 
     /**
-     * Generate the resource configuration entry as a string.
+     * Write the configuration array to a file and format it.
      *
-     * @param string $name
-     * @param array $config
-     * @param string $indent
-     * @return string
+     * @param  string  $path
+     * @param  array  $config
      */
-    protected function generateResourceEntry(string $name, array $config, string $indent): string
+    protected function writeConfig(string $path, array $config): void
     {
-        $entry = "{$indent}'{$name}' => [\n";
-        
-        foreach ($config as $key => $value) {
-            $entry .= "{$indent}    '{$key}' => ";
-            
-            if (is_array($value)) {
-                if (empty($value)) {
-                    $entry .= "[]";
-                } else {
-                    $entry .= "[\n";
-                    foreach ($value as $subKey => $subValue) {
-                        if (is_string($subKey)) {
-                            $entry .= "{$indent}        '{$subKey}' => ";
-                            $entry .= is_array($subValue) ? '[]' : var_export($subValue, true);
-                            $entry .= ",\n";
-                        } else {
-                            $entry .= "{$indent}        " . var_export($subValue, true) . ",\n";
-                        }
-                    }
-                    $entry .= "{$indent}    ]";
-                }
-            } elseif (is_string($value)) {
-                $entry .= "'{$value}'";
-            } elseif (is_bool($value)) {
-                $entry .= $value ? 'true' : 'false';
-            } else {
-                $entry .= var_export($value, true);
-            }
-            
-            $entry .= ",\n";
+        $content = "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export($config, true) . ";\n";
+        File::put($path, $content);
+
+        // Format the file using Laravel Pint for better readability
+        if (File::exists(base_path('vendor/bin/pint'))) {
+            $this->callSilently('pint', ['path' => $path]);
         }
-        
-        $entry .= "{$indent}],";
-        
-        return $entry;
     }
 
     /**
