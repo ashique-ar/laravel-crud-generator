@@ -134,10 +134,11 @@ class MakeCrudResource extends Command
         $content = File::get($configPath);
 
         // Find the resources array and add the new resource
-        // The pattern matches the 'resources' => [ ... ] section at the correct nesting level
-        $resourcesPattern = "/(\s*)('resources'\s*=>\s*\[)(.*?)(\n\1\])/s";
+        // This pattern is designed to handle complex config files with comments
+        $resourcesPattern = "/([\s]*)(['|\"]resources['|\"]\s*=>\s*\[)(.*?)(\n\s*\][,;]?\s*(?:\n|$))/s";
 
         if (preg_match($resourcesPattern, $content, $matches)) {
+            $this->info("✓ Found resources array in configuration");
             $indent = $matches[1];
             $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
 
@@ -177,8 +178,130 @@ class MakeCrudResource extends Command
             File::put($configPath, $content);
             $this->info("✓ Added resource '{$name}' to configuration");
         } else {
-            $this->warn("Could not automatically update configuration. Please add the resource manually.");
+            $this->warn("Could not automatically update configuration. Trying alternative approach...");
+            
+            // Try with a more specific pattern for heavily commented files
+            $commentAwarePattern = "/'resources'\s*=>\s*\[\s*(?:\/\/[^\n]*\n|\s*\n)*?(.*?)(\n\s*\],)/s";
+            if (preg_match($commentAwarePattern, $content, $matches)) {
+                $this->info("✓ Found resources array using comment-aware pattern");
+                $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
+                
+                $existingResources = $matches[1];
+                
+                // Add resource at the beginning or end based on configuration
+                if ($addNewResourceTo === 'top') {
+                    $newContent = str_replace(
+                        "'resources' => [", 
+                        "'resources' => [\n" . $resourceEntry, 
+                        $content
+                    );
+                } else {
+                    $newContent = str_replace(
+                        $matches[1] . $matches[2], 
+                        $matches[1] . "\n" . $resourceEntry . $matches[2], 
+                        $content
+                    );
+                }
+                
+                File::put($configPath, $newContent);
+                $this->info("✓ Added resource '{$name}' to configuration using comment-aware approach");
+            }
+            // Alternative approach using a simpler pattern
+            else if (preg_match("/(['|\"]resources['|\"]\s*=>\s*\[)(.*?)(\]\s*,)/s", $content, $matches)) {
+                $this->info("✓ Found resources array using alternative pattern");
+                $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
+                
+                $existingResources = trim($matches[2]);
+                $newResourcesContent = $matches[1];
+                
+                if ($addNewResourceTo === 'top') {
+                    $newResourcesContent .= "\n" . $resourceEntry;
+                    if (!empty($existingResources)) {
+                        $newResourcesContent .= "\n" . $existingResources;
+                    }
+                } else {
+                    if (!empty($existingResources)) {
+                        $newResourcesContent .= "\n" . $existingResources;
+                    }
+                    $newResourcesContent .= "\n" . $resourceEntry;
+                }
+                
+                $newResourcesContent .= $matches[3];
+                
+                $content = str_replace($matches[0], $newResourcesContent, $content);
+                
+                File::put($configPath, $content);
+                $this->info("✓ Added resource '{$name}' to configuration using alternative approach");
+            } else {
+                // Last resort: Find the last closing bracket of resources array by position search
+                $resourcesStart = strpos($content, "'resources' => [");
+                if ($resourcesStart !== false) {
+                    $this->info("✓ Found resources array start position");
+                    
+                    // Find the matching closing bracket by counting open/close brackets
+                    $pos = $resourcesStart + strlen("'resources' => [");
+                    $openBrackets = 1;
+                    $closingPos = null;
+                    
+                    while ($pos < strlen($content) && $openBrackets > 0) {
+                        if ($content[$pos] === '[') {
+                            $openBrackets++;
+                        } elseif ($content[$pos] === ']') {
+                            $openBrackets--;
+                            if ($openBrackets === 0) {
+                                $closingPos = $pos;
+                                break;
+                            }
+                        }
+                        $pos++;
+                    }
+                    
+                    if ($closingPos !== null) {
+                        $this->info("✓ Found resources array closing position");
+                        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
+                        
+                        // Insert resource before the closing bracket
+                        $newContent = substr($content, 0, $closingPos);
+                        $newContent .= "\n" . $resourceEntry;
+                        $newContent .= substr($content, $closingPos);
+                        
+                        File::put($configPath, $newContent);
+                        $this->info("✓ Added resource '{$name}' to configuration using positional approach");
+                    } else {
+                        $this->error("Could not find matching closing bracket for resources array.");
+                        $this->showResourceManualAddition($name, $resourceConfig);
+                    }
+                } else {
+                    $this->error("Could not automatically update configuration. Please add the resource manually.");
+                    $this->showResourceManualAddition($name, $resourceConfig);
+                }
+            }
         }
+    }
+    
+    /**
+     * Show instructions for manually adding a resource.
+     *
+     * @param string $name
+     * @param array $resourceConfig
+     */
+    protected function showResourceManualAddition(string $name, array $resourceConfig): void
+    {
+        // Show the generated resource entry for manual addition
+        $this->line("\nPlease add the following resource manually to your config/crud.php file:");
+        $this->line("\n'" . $name . "' => [");
+        foreach ($resourceConfig as $key => $value) {
+            if (is_array($value) && empty($value)) {
+                $this->line("    '" . $key . "' => [],");
+            } elseif (is_string($value)) {
+                $this->line("    '" . $key . "' => '" . $value . "',");
+            } elseif (is_bool($value)) {
+                $this->line("    '" . $key . "' => " . ($value ? 'true' : 'false') . ",");
+            } else {
+                $this->line("    '" . $key . "' => " . var_export($value, true) . ",");
+            }
+        }
+        $this->line("],");
     }
 
     /**
