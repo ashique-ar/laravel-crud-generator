@@ -134,24 +134,39 @@ class MakeCrudResource extends Command
         $content = File::get($configPath);
 
         // Find the resources array and add the new resource
-        $resourcesPattern = "/(\s*)('resources'\s*=>\s*\[)(.*?)(\n\s*\])/s";
+        // The pattern matches the 'resources' => [ ... ] section at the correct nesting level
+        $resourcesPattern = "/(\s*)('resources'\s*=>\s*\[)(.*?)(\n\1\])/s";
 
         if (preg_match($resourcesPattern, $content, $matches)) {
             $indent = $matches[1];
             $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
 
+            // Make sure we're adding at the top level of the resources array, not inside another resource
             $existingResources = trim($matches[3]);
             $newResourcesContent = $matches[2]; // 'resources' => [
 
-            if ($addNewResourceTo === 'top') {
-                $newResourcesContent .= "\n" . $resourceEntry;
-                if (!empty($existingResources)) {
-                    $newResourcesContent .= "\n" . $existingResources;
+            // Parse existing resources by using proper parsing that respects nested structures
+            if (!empty($existingResources)) {
+                // Check if resources is empty or only has comments
+                $onlyComments = preg_match('/^\s*(?:\/\/[^\n]*\n)*\s*$/s', $existingResources);
+                
+                if ($onlyComments) {
+                    // Resources array is effectively empty or just has comments
+                    if ($addNewResourceTo === 'top' || $addNewResourceTo === 'bottom') {
+                        $newResourcesContent .= "\n" . $resourceEntry;
+                    }
+                } else {
+                    // Resources array has content
+                    if ($addNewResourceTo === 'top') {
+                        $newResourcesContent .= "\n" . $resourceEntry;
+                        $newResourcesContent .= "\n" . $existingResources;
+                    } else {
+                        $newResourcesContent .= "\n" . $existingResources;
+                        $newResourcesContent .= "\n" . $resourceEntry;
+                    }
                 }
             } else {
-                if (!empty($existingResources)) {
-                    $newResourcesContent .= "\n" . $existingResources;
-                }
+                // No existing resources
                 $newResourcesContent .= "\n" . $resourceEntry;
             }
 
@@ -182,21 +197,7 @@ class MakeCrudResource extends Command
             $entry .= "{$indent}    '{$key}' => ";
             
             if (is_array($value)) {
-                if (empty($value)) {
-                    $entry .= "[]";
-                } else {
-                    $entry .= "[\n";
-                    foreach ($value as $subKey => $subValue) {
-                        if (is_string($subKey)) {
-                            $entry .= "{$indent}        '{$subKey}' => ";
-                            $entry .= is_array($subValue) ? '[]' : var_export($subValue, true);
-                            $entry .= ",\n";
-                        } else {
-                            $entry .= "{$indent}        " . var_export($subValue, true) . ",\n";
-                        }
-                    }
-                    $entry .= "{$indent}    ]";
-                }
+                $entry .= $this->formatArrayValue($value, $indent . '    ');
             } elseif (is_string($value)) {
                 $entry .= "'{$value}'";
             } elseif (is_bool($value)) {
@@ -211,6 +212,46 @@ class MakeCrudResource extends Command
         $entry .= "{$indent}],";
         
         return $entry;
+    }
+    
+    /**
+     * Format an array value recursively.
+     *
+     * @param array $array
+     * @param string $indent
+     * @return string
+     */
+    protected function formatArrayValue(array $array, string $indent): string
+    {
+        if (empty($array)) {
+            return '[]';
+        }
+        
+        $result = "[\n";
+        
+        foreach ($array as $key => $value) {
+            $result .= $indent . '    ';
+            
+            if (is_string($key)) {
+                $result .= "'{$key}' => ";
+            }
+            
+            if (is_array($value)) {
+                $result .= $this->formatArrayValue($value, $indent . '    ');
+            } elseif (is_string($value)) {
+                $result .= "'{$value}'";
+            } elseif (is_bool($value)) {
+                $result .= $value ? 'true' : 'false';
+            } else {
+                $result .= var_export($value, true);
+            }
+            
+            $result .= ",\n";
+        }
+        
+        $result .= "{$indent}]";
+        
+        return $result;
     }
 
     /**
