@@ -130,153 +130,50 @@ class MakeCrudResource extends Command
             'soft_deletes' => false,
         ];
 
-        // Read the config file content
+        // Read config file content
         $content = File::get($configPath);
-
-        // Find the resources array and add the new resource
-        // This pattern is designed to handle complex config files with comments
-        $resourcesPattern = "/([\s]*)(['|\"]resources['|\"]\s*=>\s*\[)(.*?)(\n\s*\][,;]?\s*(?:\n|$))/s";
-
-        if (preg_match($resourcesPattern, $content, $matches)) {
-            $this->info("✓ Found resources array in configuration");
-            $indent = $matches[1];
-            $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
-
-            // Make sure we're adding at the top level of the resources array, not inside another resource
-            $existingResources = trim($matches[3]);
-            $newResourcesContent = $matches[2]; // 'resources' => [
-
-            // Parse existing resources by using proper parsing that respects nested structures
-            if (!empty($existingResources)) {
-                // Check if resources is empty or only has comments
-                $onlyComments = preg_match('/^\s*(?:\/\/[^\n]*\n)*\s*$/s', $existingResources);
-                
-                if ($onlyComments) {
-                    // Resources array is effectively empty or just has comments
-                    if ($addNewResourceTo === 'top' || $addNewResourceTo === 'bottom') {
-                        $newResourcesContent .= "\n" . $resourceEntry;
-                    }
-                } else {
-                    // Resources array has content
-                    if ($addNewResourceTo === 'top') {
-                        $newResourcesContent .= "\n" . $resourceEntry;
-                        $newResourcesContent .= "\n" . $existingResources;
-                    } else {
-                        $newResourcesContent .= "\n" . $existingResources;
-                        $newResourcesContent .= "\n" . $resourceEntry;
-                    }
-                }
-            } else {
-                // No existing resources
-                $newResourcesContent .= "\n" . $resourceEntry;
-            }
-
-            $newResourcesContent .= $matches[4]; // \n];
-
-            $content = str_replace($matches[0], $newResourcesContent, $content);
-
-            File::put($configPath, $content);
-            $this->info("✓ Added resource '{$name}' to configuration");
-        } else {
-            $this->warn("Could not automatically update configuration. Trying alternative approach...");
-            
-            // Try with a more specific pattern for heavily commented files
-            $commentAwarePattern = "/'resources'\s*=>\s*\[\s*(?:\/\/[^\n]*\n|\s*\n)*?(.*?)(\n\s*\],)/s";
-            if (preg_match($commentAwarePattern, $content, $matches)) {
-                $this->info("✓ Found resources array using comment-aware pattern");
-                $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
-                
-                $existingResources = $matches[1];
-                
-                // Add resource at the beginning or end based on configuration
-                if ($addNewResourceTo === 'top') {
-                    $newContent = str_replace(
-                        "'resources' => [", 
-                        "'resources' => [\n" . $resourceEntry, 
-                        $content
-                    );
-                } else {
-                    $newContent = str_replace(
-                        $matches[1] . $matches[2], 
-                        $matches[1] . "\n" . $resourceEntry . $matches[2], 
-                        $content
-                    );
-                }
-                
-                File::put($configPath, $newContent);
-                $this->info("✓ Added resource '{$name}' to configuration using comment-aware approach");
-            }
-            // Alternative approach using a simpler pattern
-            else if (preg_match("/(['|\"]resources['|\"]\s*=>\s*\[)(.*?)(\]\s*,)/s", $content, $matches)) {
-                $this->info("✓ Found resources array using alternative pattern");
-                $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
-                
-                $existingResources = trim($matches[2]);
-                $newResourcesContent = $matches[1];
-                
-                if ($addNewResourceTo === 'top') {
-                    $newResourcesContent .= "\n" . $resourceEntry;
-                    if (!empty($existingResources)) {
-                        $newResourcesContent .= "\n" . $existingResources;
-                    }
-                } else {
-                    if (!empty($existingResources)) {
-                        $newResourcesContent .= "\n" . $existingResources;
-                    }
-                    $newResourcesContent .= "\n" . $resourceEntry;
-                }
-                
-                $newResourcesContent .= $matches[3];
-                
-                $content = str_replace($matches[0], $newResourcesContent, $content);
-                
-                File::put($configPath, $content);
-                $this->info("✓ Added resource '{$name}' to configuration using alternative approach");
-            } else {
-                // Last resort: Find the last closing bracket of resources array by position search
-                $resourcesStart = strpos($content, "'resources' => [");
-                if ($resourcesStart !== false) {
-                    $this->info("✓ Found resources array start position");
-                    
-                    // Find the matching closing bracket by counting open/close brackets
-                    $pos = $resourcesStart + strlen("'resources' => [");
-                    $openBrackets = 1;
-                    $closingPos = null;
-                    
-                    while ($pos < strlen($content) && $openBrackets > 0) {
-                        if ($content[$pos] === '[') {
-                            $openBrackets++;
-                        } elseif ($content[$pos] === ']') {
-                            $openBrackets--;
-                            if ($openBrackets === 0) {
-                                $closingPos = $pos;
-                                break;
-                            }
-                        }
-                        $pos++;
-                    }
-                    
-                    if ($closingPos !== null) {
-                        $this->info("✓ Found resources array closing position");
-                        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, '    ');
-                        
-                        // Insert resource before the closing bracket
-                        $newContent = substr($content, 0, $closingPos);
-                        $newContent .= "\n" . $resourceEntry;
-                        $newContent .= substr($content, $closingPos);
-                        
-                        File::put($configPath, $newContent);
-                        $this->info("✓ Added resource '{$name}' to configuration using positional approach");
-                    } else {
-                        $this->error("Could not find matching closing bracket for resources array.");
-                        $this->showResourceManualAddition($name, $resourceConfig);
-                    }
-                } else {
-                    $this->error("Could not automatically update configuration. Please add the resource manually.");
-                    $this->showResourceManualAddition($name, $resourceConfig);
+        // Find the top-level 'resources' array
+        $search = "'resources' => [";
+        $pos = strpos($content, $search);
+        if ($pos === false) {
+            $this->error("Resources array not found in configuration. Please add resource manually.");
+            $this->showResourceManualAddition($name, $resourceConfig);
+            return;
+        }
+        // Determine indent by capturing whitespace before 'resources'
+        $lineStart = strrpos(substr($content, 0, $pos), "\n") + 1;
+        $line = substr($content, $lineStart, $pos - $lineStart);
+        preg_match('/^(\s*)/', $line, $m);
+        $baseIndent = $m[1] ?? '';
+        // Locate matching closing bracket for resources array
+        $posOpen = strpos($content, '[', $pos);
+        $depth = 1;
+        $len = strlen($content);
+        for ($i = $posOpen + 1; $i < $len; $i++) {
+            if ($content[$i] === '[') {
+                $depth++;
+            } elseif ($content[$i] === ']') {
+                $depth--;
+                if ($depth === 0) {
+                    $posClose = $i;
+                    break;
                 }
             }
         }
+        if (!isset($posClose)) {
+            $this->error("Could not find end of resources array.");
+            $this->showResourceManualAddition($name, $resourceConfig);
+            return;
+        }
+        // Generate resource entry with correct indent
+        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $baseIndent . '    ');
+        // Insert before closing bracket
+        $newContent = substr($content, 0, $posClose)
+            . "\n" . $resourceEntry . "\n"
+            . substr($content, $posClose);
+        File::put($configPath, $newContent);
+        $this->info("✓ Added resource '{$name}' to configuration");
+        return;
     }
     
     /**
