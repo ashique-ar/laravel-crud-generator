@@ -129,47 +129,32 @@ class MakeCrudResource extends Command
             'relationships' => [],
             'soft_deletes' => false,
         ];
-
         // Read the config file content
         $content = File::get($configPath);
-
-        // This regex is designed to be more robust.
-        // It looks for 'resources' => [ and finds its corresponding closing ],
-        // by looking for the last '],' before the next top-level array key.
-        $resourcesPattern = "/('resources'\s*=>\s*\[)(.*?)(\n\s*\],(?=\s*'\w+'\s*=>))/s";
-
-        if (preg_match($resourcesPattern, $content, $matches)) {
-            $indent = '    '; // Standard indent for config arrays
-            $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
-
-            $existingResources = trim($matches[2]);
-            $newResourcesContent = $matches[1]; // 'resources' => [
-
-            if ($addNewResourceTo === 'top') {
-                $newResourcesContent .= "\n" . $resourceEntry;
-                if (!empty($existingResources)) {
-                    // Add a comma if there are existing resources
-                    $newResourcesContent .= ",\n" . $existingResources;
+        // Prepare the new resource entry
+        $indent = '    '; // Standard indent for config arrays
+        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
+        // Simple regex to locate the resources array closing bracket
+        $pattern = '/(\'resources\'\s*=>\s*\[)(.*?)(\n\s*\],)/s';
+        if (preg_match($pattern, $content)) {
+            // Insert the new entry before the closing ],
+            $content = preg_replace_callback($pattern, function ($matches) use ($resourceEntry) {
+                $opening = $matches[1];
+                $inner   = trim($matches[2]);
+                $closing = $matches[3];
+                $newInner = '';
+                if (!empty($inner)) {
+                    $newInner = "\n" . $matches[2] . ",";
                 }
-            } else {
-                if (!empty($existingResources)) {
-                    $newResourcesContent .= "\n" . $existingResources . ",";
-                }
-                $newResourcesContent .= "\n" . $resourceEntry;
-            }
-
-            $newResourcesContent .= $matches[3]; // \n    ],
-
-            // Replace the old resources block with the new one
-            $content = preg_replace($resourcesPattern, addcslashes($newResourcesContent, '\\$'), $content, 1);
-
+                $newInner .= "\n" . $resourceEntry;
+                return $opening . $newInner . $closing;
+            }, $content, 1);
             File::put($configPath, $content);
             $this->info("✓ Added resource '{$name}' to configuration");
         } else {
             $this->warn("Could not automatically update configuration. Please add the resource manually.");
         }
     }
-
     /**
      * Generate the resource configuration entry as a string.
      *
