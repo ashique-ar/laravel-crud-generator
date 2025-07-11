@@ -16,11 +16,6 @@ use Illuminate\Support\Str;
  */
 class MakeCrudResource extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'make:crud-resource
                             {name : The name of the resource (e.g., posts, users)}
                             {--model= : The model class (e.g., User, User\\Profile, App\\Models\\Admin\\User)}
@@ -29,21 +24,11 @@ class MakeCrudResource extends Command
                             {--permissions : Generate permissions for this resource}
                             {--force : Overwrite existing files}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Create a new CRUD resource configuration';
 
-    /* 
-     * @return int
-     */
     public function handle(): int
     {
-        /** @var string|null $name */
         $name = $this->argument('name');
-        /** @var string|null $modelOption */
         $modelOption = $this->option('model');
 
         if (!$name || !is_string($name)) {
@@ -51,33 +36,28 @@ class MakeCrudResource extends Command
             return Command::FAILURE;
         }
 
-        $model = $modelOption && is_string($modelOption)
+        $model = $modelOption
             ? $modelOption
             : Str::studly(Str::singular($name));
 
         $this->info("Creating CRUD resource: {$name}");
 
         try {
-            // Add resource to configuration
             $this->addToConfiguration($name, $model);
 
-            // Generate logic class if requested
             if ($this->option('logic')) {
                 $this->generateLogicClass($name, $model);
             }
 
-            // Generate API resource if requested
             if ($this->option('resource')) {
                 $this->generateApiResource($model);
             }
 
-            // Generate permissions if requested
             if ($this->option('permissions')) {
                 $this->call('crud:permissions', ['--resource' => $name]);
             }
 
             $this->showSuccessMessage($name, $model);
-
             return Command::SUCCESS;
         } catch (\Exception $e) {
             $this->error('Failed to create CRUD resource: ' . $e->getMessage());
@@ -86,90 +66,114 @@ class MakeCrudResource extends Command
     }
 
     /**
-     * Add the resource to the CRUD configuration.
-     *
-     * @param string $name
-     * @param string $model
+     * Add the resource to config/crud.php by inserting the new entry
+     * into the existing 'resources' array, preserving all old content,
+     * and honoring the add_new_resource_to setting (top|bottom).
      */
     protected function addToConfiguration(string $name, string $model): void
     {
         $configPath = config_path('crud.php');
-
         if (!File::exists($configPath)) {
             $this->error('CRUD configuration file not found. Run php artisan crud:install first.');
             return;
         }
 
-        // Load existing config and prepare resources array
+        // Load the PHP config array so we can read the add_new_resource_to setting
         $config = include $configPath;
-        $resources = $config['resources'] ?? [];
+        $where = $config['add_new_resource_to'] ?? 'bottom';
+        $where = in_array($where, ['top', 'bottom'], true) ? $where : 'bottom';
 
-        if (isset($resources[$name]) && !$this->option('force')) {
+        // If resource already exists and no --force, confirm overwrite
+        if (isset($config['resources'][$name]) && !$this->option('force')) {
             if (!$this->confirm("Resource '{$name}' already exists. Overwrite?")) {
                 $this->warn('Skipped resource configuration.');
-
                 return;
             }
         }
 
-        $addNewResourceTo = $config['add_new_resource_to'] ?? 'bottom';
-
+        // Build the new resource config
         $resourceConfig = [
             'model' => $this->getFullModelNamespace($model),
             'middleware' => ['auth:sanctum', 'crud.permissions'],
-            'rules' => [
-                'store' => [],
-                'update' => [],
-            ],
-            'pagination' => [
-                'per_page' => 15,
-                'max_per_page' => 100,
-            ],
+            'rules' => ['store' => [], 'update' => []],
+            'pagination' => ['per_page' => 15, 'max_per_page' => 100],
             'searchable_fields' => [],
             'sortable_fields' => ['id', 'created_at', 'updated_at'],
             'filterable_fields' => [],
             'relationships' => [],
             'soft_deletes' => false,
         ];
-        // Insert new resource at top or bottom
-        if ($addNewResourceTo === 'top') {
-            $resources = array_merge([$name => $resourceConfig], $resources);
+
+        // Read the raw file
+        $raw = File::get($configPath);
+
+        // 1) Find "'resources'" key
+        $start = strpos($raw, "'resources'");
+        if ($start === false) {
+            $this->error("Couldn't find 'resources' key in config/crud.php");
+            return;
+        }
+
+        // 2) Find the opening '[' of the resources array
+        $openBracketPos = strpos($raw, '[', $start);
+        if ($openBracketPos === false) {
+            $this->error("Malformed 'resources' array");
+            return;
+        }
+
+        // 3) Walk forward to find its matching closing ']'
+        $level = 1;
+        $pos = $openBracketPos + 1;
+        $len = strlen($raw);
+        while ($level > 0 && $pos < $len) {
+            if ($raw[$pos] === '[') {
+                $level++;
+            } elseif ($raw[$pos] === ']') {
+                $level--;
+            }
+            $pos++;
+        }
+        if ($level !== 0) {
+            $this->error("Unbalanced brackets in 'resources' array");
+            return;
+        }
+        $closeBracketPos = $pos - 1; // index of the matching ']'
+
+        // 4) Slice into three parts
+        $before = substr($raw, 0, $openBracketPos + 1);
+        $between = substr($raw, $openBracketPos + 1, $closeBracketPos - ($openBracketPos + 1));
+        $after = substr($raw, $closeBracketPos);
+
+        // 5) Build your new entry text
+        $indent = '    ';        // 4 spaces for top-level
+        $itemIndent = $indent . '    '; // 8 spaces for items
+        $newEntry = $this->generateResourceEntry($name, $resourceConfig, $itemIndent);
+
+        // 6) Insert at top or bottom of the existing block
+        $trimmed = rtrim($between, "\r\n");
+        if ($where === 'top') {
+            // put new entry before everything else
+            $newBetween = "\n" . $newEntry . "\n" . $trimmed . "\n";
         } else {
-            $resources[$name] = $resourceConfig;
+            // append after existing entries
+            $newBetween = $trimmed . "\n" . $newEntry . "\n";
         }
-        // Build new resources block string
-        $indent = '    ';
-        $entries = '';
-        foreach ($resources as $resKey => $resCfg) {
-            $entries .= $this->generateResourceEntry($resKey, $resCfg, $indent . '    ') . "
-";
-        }
-        $block = $indent . "'resources' => [
-" . $entries . $indent . '],';
-        // Replace the full resources block with regenerated block
-        $content = File::get($configPath);
-        // Replace everything between 'resources' => [ and the matching '],'
-        $pattern = "/'resources'\s*=>\s*\[[\s\S]*?\],/";
-        $content = preg_replace($pattern, $block, $content, 1);
-        File::put($configPath, $content);
-        $this->info("✓ Added resource '{$name}' to configuration");
-        return;
+
+        // 7) Reassemble & write back
+        $newRaw = $before . $newBetween . $after;
+        File::put($configPath, $newRaw);
+
+        $this->info("✓ Added resource '{$name}' to configuration ({$where})");
     }
+
     /**
-     * Generate the resource configuration entry as a string.
-     *
-     * @param string $name
-     * @param array $config
-     * @param string $indent
-     * @return string
+     * Render a single resource entry as PHP source.
      */
     protected function generateResourceEntry(string $name, array $config, string $indent): string
     {
         $entry = "{$indent}'{$name}' => [\n";
-
         foreach ($config as $key => $value) {
             $entry .= "{$indent}    '{$key}' => ";
-
             if (is_array($value)) {
                 if (empty($value)) {
                     $entry .= "[]";
@@ -177,11 +181,15 @@ class MakeCrudResource extends Command
                     $entry .= "[\n";
                     foreach ($value as $subKey => $subValue) {
                         if (is_string($subKey)) {
-                            $entry .= "{$indent}        '{$subKey}' => ";
-                            $entry .= is_array($subValue) ? '[]' : var_export($subValue, true);
-                            $entry .= ",\n";
+                            $entry .= "{$indent}        '{$subKey}' => "
+                                . (is_array($subValue)
+                                    ? '[]'
+                                    : var_export($subValue, true))
+                                . ",\n";
                         } else {
-                            $entry .= "{$indent}        " . var_export($subValue, true) . ",\n";
+                            $entry .= "{$indent}        "
+                                . var_export($subValue, true)
+                                . ",\n";
                         }
                     }
                     $entry .= "{$indent}    ]";
@@ -193,25 +201,15 @@ class MakeCrudResource extends Command
             } else {
                 $entry .= var_export($value, true);
             }
-
             $entry .= ",\n";
         }
-
         $entry .= "{$indent}],";
-
         return $entry;
     }
 
-    /**
-     * Generate a custom logic class for the resource.
-     *
-     * @param string $name
-     * @param string $model
-     */
     protected function generateLogicClass(string $name, string $model): void
     {
         $logicName = Str::studly($name) . 'Logic';
-
         $this->call('make:crud-logic', [
             'name' => $logicName,
             '--model' => $model,
@@ -219,11 +217,6 @@ class MakeCrudResource extends Command
         ]);
     }
 
-    /**
-     * Generate an API resource class.
-     *
-     * @param string $model
-     */
     protected function generateApiResource(string $model): void
     {
         $this->call('make:resource', [
@@ -232,52 +225,28 @@ class MakeCrudResource extends Command
         ]);
     }
 
-    /**
-     * Show success message with next steps.
-     *
-     * @param string $name
-     * @param string $model
-     */
     protected function showSuccessMessage(string $name, string $model): void
     {
-        $fullModelNamespace = $this->getFullModelNamespace($model);
+        $fullModel = $this->getFullModelNamespace($model);
 
         $this->newLine();
         $this->info("✓ CRUD resource '{$name}' created successfully!");
         $this->newLine();
-
         $this->line('<options=bold>Next Steps:</>');
-        $this->line("1. Review the configuration in <comment>config/crud.php</comment>");
-        $this->line("2. Customize validation rules, searchable fields, etc.");
-        $this->line("3. Ensure the <comment>{$fullModelNamespace}</comment> model exists");
-        $this->line("4. Register routes in your <comment>routes/api.php</comment> or <comment>RouteServiceProvider</comment>:");
-        $this->line("   <comment>CrudGenerator::registerRoutes('api/v1', ['auth:sanctum']);</comment>");
-        $this->line("5. Test the API endpoints:");
-        $this->line("   - GET /api/v1/{$name}");
-        $this->line("   - POST /api/v1/{$name}");
-        $this->line("   - GET /api/v1/{$name}/{id}");
-        $this->line("   - PUT /api/v1/{$name}/{id}");
-        $this->line("   - DELETE /api/v1/{$name}/{id}");
-        $this->line("6. View API documentation:");
-        $this->line("   - GET /api/v1/docs (all resources)");
-        $this->line("   - GET /api/v1/{$name}/docs (this resource)");
+        $this->line("1. Review config/crud.php");
+        $this->line("2. Customize validation, searchable fields, etc.");
+        $this->line("3. Ensure <comment>{$fullModel}</comment> exists");
+        $this->line("4. Register routes:");
+        $this->line("   CrudGenerator::registerRoutes('api/v1', ['auth:sanctum']);");
+        $this->line("5. Test endpoints: GET, POST, GET/{id}, PUT/{id}, DELETE/{id}");
+        $this->line("6. View docs: GET /api/v1/docs and /api/v1/{$name}/docs");
         $this->newLine();
     }
 
-    /**
-     * Get the full model namespace.
-     *
-     * @param string $model
-     * @return string
-     */
     protected function getFullModelNamespace(string $model): string
     {
-        // If the model contains backslashes, it's already a fully qualified namespace
-        if (str_contains($model, '\\')) {
-            return $model;
-        }
-
-        // If it's just a class name, assume it's in App\Models
-        return "App\\Models\\{$model}";
+        return Str::contains($model, '\\')
+            ? $model
+            : "App\\Models\\{$model}";
     }
 }
