@@ -146,10 +146,22 @@ class MakeCrudResource extends Command
         }
         $block = $indent . "'resources' => [
 " . $entries . $indent . '],';
-        // Replace the resources block in the file content (allow any whitespace/formatting inside)
+        // Replace the full `resources` block with regenerated content
         $content = File::get($configPath);
-        $pattern = "/('resources'\s*=>\s*\[)[\s\S]*?(\],)/";
-        $content = preg_replace($pattern, $block, $content, 1);
+        // Match resources block up to the add_new_resource_to setting
+        $pattern = "/('resources'\s*=>\s*\[)([\s\S]*?)(\n\s*\],\s*'add_new_resource_to')/";
+        $content = preg_replace_callback($pattern, function ($matches) use ($resources, $indent) {
+            $openPart  = $matches[1];
+            $tailPart  = $matches[3];
+            $entries = '';
+            foreach ($resources as $key => $cfg) {
+                $entries .= $this->generateResourceEntry($key, $cfg, $indent . '    ') . "\n";
+            }
+            // Rebuild: opening, all entries, closing comma plus next key
+            return $openPart
+                 . "\n" . $entries
+                 . $indent . '], ' . $tailPart;
+        }, $content, 1);
         File::put($configPath, $content);
         $this->info("✓ Added resource '{$name}' to configuration");
         return;
