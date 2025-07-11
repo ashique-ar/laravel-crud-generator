@@ -27,7 +27,13 @@ class CrudGeneratorServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Merge package configuration
-        $this->mergeConfigFrom(__DIR__.'/../config/crud.php', 'crud');
+        $configFile = __DIR__.'/../config/crud.php';
+        $defaultConfig = require $configFile;
+        $existingConfig = $this->app['config']->get('crud', []);
+        if (! is_array($existingConfig)) {
+            $existingConfig = [];
+        }
+        $this->app['config']->set('crud', array_merge($defaultConfig, $existingConfig));
 
         // Register singleton for CRUD manager
         $this->app->singleton('crud-generator', function ($app) {
