@@ -103,7 +103,7 @@ class GenerateCrudPermissions extends Command
             $this->line("Processing resource: <comment>{$resource}</comment>");
 
             foreach ($this->operations as $operation) {
-                $permissionName = "{$operation}-{$resource}";
+                $permissionName = "{$operation}.{$resource}";
 
                 $exists = Permission::where('name', $permissionName)->exists();
 
