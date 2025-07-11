@@ -107,7 +107,7 @@ class CrudGeneratorServiceProvider extends ServiceProvider
             // Publish configuration file
             $this->publishes([
                 __DIR__.'/../config/crud.php' => config_path('crud.php'),
-            ], 'crud-config');
+            ], ['crud-config', 'config']);
 
             // Publish stub files
             $this->publishes([
