@@ -45,14 +45,14 @@ class MakeCrudResource extends Command
         $name = $this->argument('name');
         /** @var string|null $modelOption */
         $modelOption = $this->option('model');
-        
+
         if (!$name || !is_string($name)) {
             $this->error('Resource name is required.');
             return Command::FAILURE;
         }
-        
-        $model = $modelOption && is_string($modelOption) 
-            ? $modelOption 
+
+        $model = $modelOption && is_string($modelOption)
+            ? $modelOption
             : Str::studly(Str::singular($name));
 
         $this->info("Creating CRUD resource: {$name}");
@@ -100,9 +100,11 @@ class MakeCrudResource extends Command
             return;
         }
 
+        // Load existing config and prepare resources array
         $config = include $configPath;
+        $resources = $config['resources'] ?? [];
 
-        if (isset($config['resources'][$name]) && !$this->option('force')) {
+        if (isset($resources[$name]) && !$this->option('force')) {
             if (!$this->confirm("Resource '{$name}' already exists. Overwrite?")) {
                 $this->warn('Skipped resource configuration.');
 
@@ -129,31 +131,28 @@ class MakeCrudResource extends Command
             'relationships' => [],
             'soft_deletes' => false,
         ];
-        // Read the config file content
-        $content = File::get($configPath);
-        // Prepare the new resource entry
-        $indent = '    '; // Standard indent for config arrays
-        $resourceEntry = $this->generateResourceEntry($name, $resourceConfig, $indent . '    ');
-        // Simple regex to locate the resources array closing bracket
-        $pattern = '/(\'resources\'\s*=>\s*\[)(.*?)(\n\s*\],)/s';
-        if (preg_match($pattern, $content)) {
-            // Insert the new entry before the closing ],
-            $content = preg_replace_callback($pattern, function ($matches) use ($resourceEntry) {
-                $opening = $matches[1];
-                $inner   = trim($matches[2]);
-                $closing = $matches[3];
-                $newInner = '';
-                if (!empty($inner)) {
-                    $newInner = "\n" . $matches[2] . ",";
-                }
-                $newInner .= "\n" . $resourceEntry;
-                return $opening . $newInner . $closing;
-            }, $content, 1);
-            File::put($configPath, $content);
-            $this->info("✓ Added resource '{$name}' to configuration");
+        // Insert new resource at top or bottom
+        if ($addNewResourceTo === 'top') {
+            $resources = array_merge([$name => $resourceConfig], $resources);
         } else {
-            $this->warn("Could not automatically update configuration. Please add the resource manually.");
+            $resources[$name] = $resourceConfig;
         }
+        // Build new resources block string
+        $indent = '    ';
+        $entries = '';
+        foreach ($resources as $resKey => $resCfg) {
+            $entries .= $this->generateResourceEntry($resKey, $resCfg, $indent . '    ') . "
+";
+        }
+        $block = $indent . "'resources' => [
+" . $entries . $indent . '],';
+        // Replace the resources block in the file content (allow any whitespace/formatting inside)
+        $content = File::get($configPath);
+        $pattern = "/('resources'\s*=>\s*\[)[\s\S]*?(\],)/";
+        $content = preg_replace($pattern, $block, $content, 1);
+        File::put($configPath, $content);
+        $this->info("✓ Added resource '{$name}' to configuration");
+        return;
     }
     /**
      * Generate the resource configuration entry as a string.
@@ -166,10 +165,10 @@ class MakeCrudResource extends Command
     protected function generateResourceEntry(string $name, array $config, string $indent): string
     {
         $entry = "{$indent}'{$name}' => [\n";
-        
+
         foreach ($config as $key => $value) {
             $entry .= "{$indent}    '{$key}' => ";
-            
+
             if (is_array($value)) {
                 if (empty($value)) {
                     $entry .= "[]";
@@ -193,12 +192,12 @@ class MakeCrudResource extends Command
             } else {
                 $entry .= var_export($value, true);
             }
-            
+
             $entry .= ",\n";
         }
-        
+
         $entry .= "{$indent}],";
-        
+
         return $entry;
     }
 
@@ -211,7 +210,7 @@ class MakeCrudResource extends Command
     protected function generateLogicClass(string $name, string $model): void
     {
         $logicName = Str::studly($name) . 'Logic';
-        
+
         $this->call('make:crud-logic', [
             'name' => $logicName,
             '--model' => $model,
@@ -241,7 +240,7 @@ class MakeCrudResource extends Command
     protected function showSuccessMessage(string $name, string $model): void
     {
         $fullModelNamespace = $this->getFullModelNamespace($model);
-        
+
         $this->newLine();
         $this->info("✓ CRUD resource '{$name}' created successfully!");
         $this->newLine();
@@ -276,7 +275,7 @@ class MakeCrudResource extends Command
         if (str_contains($model, '\\')) {
             return $model;
         }
-        
+
         // If it's just a class name, assume it's in App\Models
         return "App\\Models\\{$model}";
     }
