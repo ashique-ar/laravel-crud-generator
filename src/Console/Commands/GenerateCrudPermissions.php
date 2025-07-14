@@ -8,152 +8,153 @@ use Illuminate\Console\Command;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
-/**
- * Generate CRUD permissions command.
- *
- * This command automatically generates the standard CRUD permissions
- * (create, read, update, delete) for all configured resources in the
- * crud configuration file.
- */
 class GenerateCrudPermissions extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'crud:permissions
-                            {--resource= : Generate permissions for specific resource only}
-                            {--role= : Assign permissions to specific role}
+                            {--resource= : Generate permissions for a specific resource only}
+                            {--role= : Assign permissions to a specific role}
                             {--force : Recreate existing permissions}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Generate CRUD permissions for configured resources';
 
-    /**
-     * Standard CRUD operations that require permissions.
-     *
-     * @var array<string>
-     */
-    protected array $operations = ['create', 'read', 'update', 'delete'];
+    /** @var string[] */
+    protected array $defaultOperations = ['create', 'read', 'update', 'delete'];
 
-    /**
-     * Execute the console command.
-     */
+    /** @var string */
+    protected string $defaultGuard = 'web';
+
     public function handle(): int
     {
         $this->info('Generating CRUD permissions...');
 
-        try {
-            $resources = $this->getResources();
-
-            if (empty($resources)) {
-                $this->warn('No resources found in configuration.');
-
-                return Command::SUCCESS;
-            }
-
-            $this->generatePermissions($resources);
-
-            if ($role = $this->option('role')) {
-                $this->assignPermissionsToRole($role);
-            }
-
-            $this->info('✓ CRUD permissions generated successfully!');
-
+        $resources = $this->getResources();
+        if (empty($resources)) {
+            $this->warn('No resources found in configuration.');
             return Command::SUCCESS;
-        } catch (\Exception $e) {
-            $this->error('Failed to generate permissions: '.$e->getMessage());
-
-            return Command::FAILURE;
         }
+
+        $this->generatePermissions($resources);
+
+        // 1) If user passed --role, sync to that role
+        if ($roleName = $this->option('role')) {
+            $this->assignPermissionsToRole($roleName);
+        }
+
+        // 2) Always sync to the super-admin role by default
+        $superAdminRole = config('crud.permissions.super_admin_role');
+        if ($superAdminRole) {
+            $this->assignPermissionsToRole($superAdminRole);
+        }
+
+        $this->info('✓ CRUD permissions generated successfully!');
+        return Command::SUCCESS;
     }
 
-    /**
-     * Get resources from configuration or command option.
-     *
-     * @return array<string>
-     */
     protected function getResources(): array
     {
-        if ($resource = $this->option('resource')) {
-            return [$resource];
+        if ($res = $this->option('resource')) {
+            return [$res];
         }
 
-        $config = config('crud.resources', []);
-
-        return array_keys($config);
+        return array_keys(config('crud.resources', []));
     }
 
     /**
-     * Generate permissions for the given resources.
-     *
-     * @param  array<string>  $resources
+     * @return string[]
      */
+    protected function getGuards(): array
+    {
+        $guards = config('crud.permissions.guard', [$this->defaultGuard]);
+
+        return is_array($guards) ? $guards : [$guards];
+    }
+
+    protected function getFormat(): string
+    {
+        return config('crud.permissions.format', '{action}.{resource}');
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function getActions(): array
+    {
+        return config('crud.permissions.actions', $this->defaultOperations);
+    }
+
     protected function generatePermissions(array $resources): void
     {
-        $createdCount = 0;
-        $skippedCount = 0;
+        $created = 0;
+        $skipped = 0;
+
+        $guards = $this->getGuards();
+        $format = $this->getFormat();
+        $actions = $this->getActions();
 
         foreach ($resources as $resource) {
             $this->line("Processing resource: <comment>{$resource}</comment>");
 
-            foreach ($this->operations as $operation) {
-                $permissionName = "{$operation}.{$resource}";
-
-                $exists = Permission::where('name', $permissionName)->exists();
-
-                if ($exists && ! $this->option('force')) {
-                    $this->warn("  ↳ Permission '{$permissionName}' already exists");
-                    $skippedCount++;
-
-                    continue;
-                }
-
-                if ($exists && $this->option('force')) {
-                    Permission::where('name', $permissionName)->delete();
-                    $this->warn("  ↳ Deleted existing permission '{$permissionName}'");
-                }
-
-                Permission::create([
-                    'name' => $permissionName,
-                    'guard_name' => 'web',
+            foreach ($actions as $action) {
+                // build the permission name from your format string
+                $name = strtr($format, [
+                    '{action}' => $action,
+                    '{resource}' => $resource,
                 ]);
 
-                $this->info("  ↳ Created permission '{$permissionName}'");
-                $createdCount++;
+                foreach ($guards as $guard) {
+                    $exists = Permission::where([
+                        ['name', $name],
+                        ['guard_name', $guard],
+                    ])->exists();
+
+                    if ($exists && !$this->option('force')) {
+                        $this->warn("  ↳ Permission '{$name}' [{$guard}] already exists");
+                        $skipped++;
+                        continue;
+                    }
+
+                    if ($exists && $this->option('force')) {
+                        Permission::where('name', $name)
+                            ->where('guard_name', $guard)
+                            ->delete();
+                        $this->warn("  ↳ Deleted existing permission '{$name}' [{$guard}]");
+                    }
+
+                    Permission::create([
+                        'name' => $name,
+                        'guard_name' => $guard,
+                    ]);
+
+                    $this->info("  ↳ Created permission '{$name}' [{$guard}]");
+                    $created++;
+                }
             }
         }
 
         $this->newLine();
-        $this->info("Summary: {$createdCount} permissions created, {$skippedCount} skipped");
+        $this->info("Summary: {$created} permissions created, {$skipped} skipped");
     }
 
     /**
-     * Assign generated permissions to a specific role.
+     * Sync *all* permissions matching this role name (and its guard)
+     * to the given role.
      */
     protected function assignPermissionsToRole(string $roleName): void
     {
-        $this->info("Assigning permissions to role: {$roleName}");
+        // if you want the role to exist on each guard, loop guards
+        foreach ($this->getGuards() as $guard) {
+            $role = Role::firstOrCreate(
+                ['name' => $roleName, 'guard_name' => $guard]
+            );
 
-        $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            // grab every permission for this guard
+            $perms = Permission::where('guard_name', $guard)
+                ->pluck('name')
+                ->all();
 
-        $resources = $this->getResources();
-        $permissions = [];
+            $role->syncPermissions($perms);
 
-        foreach ($resources as $resource) {
-            foreach ($this->operations as $operation) {
-                $permissions[] = "{$operation}-{$resource}";
-            }
+            $this->info("✓ Assigned " . count($perms) . " [{$guard}] permissions to role '{$roleName}'");
         }
-
-        $existingPermissions = Permission::whereIn('name', $permissions)->get();
-        $role->syncPermissions($existingPermissions);
-
-        $this->info("✓ Assigned {$existingPermissions->count()} permissions to role '{$roleName}'");
     }
 }

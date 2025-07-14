@@ -667,7 +667,7 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ## 🙏 Credits
 
-- [Your Name](https://github.com/yourusername)
+- [Your Name](https://github.com/ashique-ar)
 - [All Contributors](../../contributors)
 
 ## 💡 Support

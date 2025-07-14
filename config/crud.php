@@ -65,7 +65,7 @@ return [
     */
     'permissions' => [
         'enabled' => true,
-        'guard' => 'web',
+        'guard' => ['web', 'api'],
         'format' => '{action}-{resource}',
         'actions' => ['view', 'create', 'edit', 'delete'],
         'super_admin_role' => 'super-admin',
