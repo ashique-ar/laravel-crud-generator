@@ -27,7 +27,7 @@ class CheckCrudPermission
     {
         $user = $request->user();
 
-        if (! $user) {
+        if (!$user) {
             throw UnauthorizedException::notLoggedIn();
         }
 
@@ -35,16 +35,22 @@ class CheckCrudPermission
         $resource = $this->getResourceFromRoute($request);
         $action = $this->getActionFromRequest($request);
 
-        if (! $resource || ! $action) {
+        if (!$resource || !$action) {
             return $next($request);
         }
 
         // Check if permissions are enabled for this resource
         $resourceConfig = config("crud.resources.{$resource}");
-        if (! ($resourceConfig['permissions']['enabled'] ?? false)) {
+        // if (! ($resourceConfig['permissions']['enabled'] ?? false)) {
+        //     return $next($request);
+        // }
+        $enabled = $resourceConfig['permissions']['enabled']
+            ?? config('crud.permissions.enabled', false);
+
+        if (!$enabled) {
             return $next($request);
         }
-
+        
         // Check if user has super admin role
         $superAdminRole = config('crud.permissions.super_admin_role', 'super-admin');
         if ($user->hasRole($superAdminRole)) {
@@ -60,7 +66,7 @@ class CheckCrudPermission
         );
 
         // Check permission
-        if (! $user->can($permission)) {
+        if (!$user->can($permission)) {
             throw UnauthorizedException::forPermissions([$permission]);
         }
 
@@ -74,7 +80,7 @@ class CheckCrudPermission
     {
         $route = $request->route();
 
-        if (! $route) {
+        if (!$route) {
             return null;
         }
 
@@ -217,7 +223,7 @@ class CheckCrudPermission
     {
         // Check if URI ends with an ID parameter pattern
         return preg_match('/\/\{[^}]+\}$/', $uri) ||
-               preg_match('/\/[0-9]+$/', $uri);
+            preg_match('/\/[0-9]+$/', $uri);
     }
 
     /**
@@ -228,9 +234,9 @@ class CheckCrudPermission
         // Remove query parameters and check if it's a clean resource URI
         $cleanUri = explode('?', $uri)[0];
 
-        return ! $this->isShowRoute($cleanUri) &&
-               ! str_contains($cleanUri, '/bulk') &&
-               ! str_contains($cleanUri, '/trashed') &&
-               ! str_contains($cleanUri, '/docs');
+        return !$this->isShowRoute($cleanUri) &&
+            !str_contains($cleanUri, '/bulk') &&
+            !str_contains($cleanUri, '/trashed') &&
+            !str_contains($cleanUri, '/docs');
     }
 }
