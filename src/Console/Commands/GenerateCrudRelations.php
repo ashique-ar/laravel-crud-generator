@@ -176,42 +176,55 @@ class GenerateCrudRelations extends Command
         $configPath = config_path('crud.php');
         $content = File::get($configPath);
 
-        // 1) Grab the whole resource block, ending on the line with exactly 8 spaces + ],
-        $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\n {8}\],)/";
-
-        if (!preg_match($pattern, $content, $matches)) {
-            $this->error("Resource '{$resource}' not found in configuration.");
+        // 1) Capture the full resource block up to its closing "],"
+        $resourceRegex = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\n {8}\],)/";
+        if (!preg_match($resourceRegex, $content, $m)) {
+            $this->error("Resource '{$resource}' not found.");
             return Command::FAILURE;
         }
 
-        $resourceBlock = $matches[2];
+        $block = $m[2];
 
-        // 2) Remove any existing relationships block (12 spaces indent) wherever it is
-        $resourceBlock = preg_replace(
-            "/\n {12}'relationships'\s*=>\s*\[[\s\S]*?\],\n/",
-            "\n",
-            $resourceBlock
-        );
-
-        // 3) Build the new relationships snippet (also 12 spaces indent)
+        // Build the new relationships snippet (12‑space indent)
         $newRel = $this->generateRelationshipsContent($relations);
-        $relationships =
-            "            'relationships' => [\n" .   // 12 spaces
+        $relBlock =
+            "            'relationships' => [\n" .
             $newRel . "\n" .
-            "            ],\n";                  // 12 spaces
+            "            ],\n";
 
-        // 4) Append it before the resource's closing ], (8 spaces indent)
-        $resourceBlock = rtrim($resourceBlock) . "\n" . $relationships;
+        // 2) If an existing relationships block is present (12 spaces indent), replace it
+        $hasExisting =
+            preg_match(
+                "/ {12}'relationships'\s*=>\s*\[[\s\S]*?\],\n/",
+                $block
+            );
 
-        // 5) Put it back into the file
-        $newFile = preg_replace($pattern, "$1{$resourceBlock}$3", $content);
-        File::put($configPath, $newFile);
+        if ($hasExisting) {
+            // Replace whatever’s inside relationships => [ … ],
+            $block = preg_replace(
+                "/ {12}'relationships'\s*=>\s*\[[\s\S]*?\],\n/",
+                "\n" . $relBlock,
+                $block
+            );
+        } else {
+            // 3) Otherwise append our new block just before the resource's closing (8 spaces)
+            $block = rtrim($block) . "\n" . $relBlock;
+        }
 
-        $this->info("✓ Updated relations for resource '{$resource}'");
+        // 4) Reassemble and write back
+        $newContent = preg_replace(
+            $resourceRegex,
+            "$1{$block}$3",
+            $content
+        );
+        File::put($configPath, $newContent);
+
+        $this->info("✓ Relations for '{$resource}' have been updated.");
         $this->showRelationsSummary($relations);
 
         return Command::SUCCESS;
     }
+
 
 
     /**
