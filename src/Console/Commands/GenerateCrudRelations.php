@@ -176,45 +176,34 @@ class GenerateCrudRelations extends Command
         $configPath = config_path('crud.php');
         $content = File::get($configPath);
 
-        // Match the entire resource block, closing on the line with exactly 8 spaces + ],
-        // so nested arrays (like middleware) won’t prematurely terminate the match.
+        // 1) Grab the whole resource block, ending on the line with exactly 8 spaces + ],
         $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\n {8}\],)/";
 
         if (!preg_match($pattern, $content, $matches)) {
-            $this->error("Could not find resource '{$resource}' in configuration.");
+            $this->error("Resource '{$resource}' not found in configuration.");
             return Command::FAILURE;
         }
 
         $resourceBlock = $matches[2];
 
-        // If there's already a relationships block (indented 12 spaces), replace it.
-        if (strpos($resourceBlock, "'relationships'") !== false) {
-            $relationshipsPattern =
-                "/( {12}'relationships'\s*=>\s*\[)([\s\S]*?)(\n {12}\],)/";
+        // 2) Remove any existing relationships block (12 spaces indent) wherever it is
+        $resourceBlock = preg_replace(
+            "/\n {12}'relationships'\s*=>\s*\[[\s\S]*?\],\n/",
+            "\n",
+            $resourceBlock
+        );
 
-            if (preg_match($relationshipsPattern, $resourceBlock, $relMatches)) {
-                $newContent = $this->generateRelationshipsContent($relations);
+        // 3) Build the new relationships snippet (also 12 spaces indent)
+        $newRel = $this->generateRelationshipsContent($relations);
+        $relationships =
+            "            'relationships' => [\n" .   // 12 spaces
+            $newRel . "\n" .
+            "            ],\n";                  // 12 spaces
 
-                $resourceBlock = preg_replace(
-                    $relationshipsPattern,
-                    "            'relationships' => [\n"    // 12 spaces
-                    . $newContent
-                    . "\n            ],",                 // 12 spaces
-                    $resourceBlock
-                );
-            }
-        } else {
-            // No existing relationships: append them at 12 spaces, just before the resource's closing ],
-            $newContent = $this->generateRelationshipsContent($relations);
-            $relationshipsBlock =
-                "            'relationships' => [\n"  // 12 spaces
-                . $newContent
-                . "\n            ],\n";               // 12 spaces
+        // 4) Append it before the resource's closing ], (8 spaces indent)
+        $resourceBlock = rtrim($resourceBlock) . "\n" . $relationships;
 
-            $resourceBlock = rtrim($resourceBlock) . "\n" . $relationshipsBlock;
-        }
-
-        // Reassemble and write back
+        // 5) Put it back into the file
         $newFile = preg_replace($pattern, "$1{$resourceBlock}$3", $content);
         File::put($configPath, $newFile);
 
@@ -223,6 +212,7 @@ class GenerateCrudRelations extends Command
 
         return Command::SUCCESS;
     }
+
 
     /**
      * Generate the relationships content string.
