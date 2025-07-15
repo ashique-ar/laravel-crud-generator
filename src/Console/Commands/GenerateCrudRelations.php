@@ -47,7 +47,7 @@ class GenerateCrudRelations extends Command
     public function handle(): int
     {
         $resource = $this->argument('resource');
-        
+
         if (!$resource || !is_string($resource)) {
             $this->error('Resource name is required.');
             return Command::FAILURE;
@@ -81,10 +81,10 @@ class GenerateCrudRelations extends Command
         $this->newLine();
 
         $relations = [];
-        
+
         while (true) {
             $field = $this->ask('Enter field name (e.g., category_id) or press Enter to finish');
-            
+
             if (empty($field)) {
                 break;
             }
@@ -110,7 +110,7 @@ class GenerateCrudRelations extends Command
     protected function addSingleRelation(string $resource): int
     {
         $field = $this->option('field');
-        
+
         if (!$field) {
             $this->error('Field name is required. Use --field option or --interactive mode.');
             return Command::FAILURE;
@@ -146,7 +146,7 @@ class GenerateCrudRelations extends Command
         $required = $this->confirm('Is this field required?', false);
         $dependsOn = $this->ask('Depends on field (optional)');
         $filterBy = null;
-        
+
         if ($dependsOn) {
             $filterBy = $this->ask('Filter by field', $dependsOn);
         }
@@ -176,39 +176,34 @@ class GenerateCrudRelations extends Command
         $configPath = config_path('crud.php');
         $content = File::get($configPath);
 
-        // Find the specific resource block
-        $pattern = "/('$resource'\s*=>\s*\[)([\s\S]*?)(\n\s*\],)/";
-        
+        // 1. Locate the entire resource block
+        $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\n\s*\],)/";
         if (!preg_match($pattern, $content, $matches)) {
             $this->error("Could not find resource '{$resource}' in configuration.");
             return Command::FAILURE;
         }
 
         $resourceBlock = $matches[2];
-        
-        // Check if relationships key already exists
-        if (strpos($resourceBlock, "'relationships'") !== false) {
-            // Update existing relationships
-            $relationshipsPattern = "/('relationships'\s*=>\s*\[)([\s\S]*?)(\n\s*\],)/";
-            if (preg_match($relationshipsPattern, $resourceBlock, $relMatches)) {
-                $newRelationshipsContent = $this->generateRelationshipsContent($relations);
-                $resourceBlock = preg_replace(
-                    $relationshipsPattern,
-                    "'relationships' => [\n" . $newRelationshipsContent . "\n        ],",
-                    $resourceBlock
-                );
-            }
-        } else {
-            // Add relationships key
-            $newRelationshipsContent = $this->generateRelationshipsContent($relations);
-            $relationshipsBlock = "        'relationships' => [\n" . $newRelationshipsContent . "\n        ],\n";
-            
-            // Insert before the closing bracket
-            $resourceBlock = rtrim($resourceBlock) . "\n" . $relationshipsBlock;
-        }
 
-        // Replace the resource block in the content
-        $newContent = preg_replace($pattern, "$1$resourceBlock$3", $content);
+        // 2. Remove any existing 'relationships' block (to avoid duplicates or mis‑nesting)
+        $resourceBlock = preg_replace(
+            "/\s*'relationships'\s*=>\s*\[[\s\S]*?\],\n/",
+            "",
+            $resourceBlock
+        );
+
+        // 3. Generate your new relationships content
+        $newRelationshipsContent = $this->generateRelationshipsContent($relations);
+        $relationshipsBlock =
+            "        'relationships' => [\n"
+            . $newRelationshipsContent . "\n"
+            . "        ],\n";
+
+        // 4. Append it to the end of the resource (just before the closing ],)
+        $resourceBlock = rtrim($resourceBlock) . "\n" . $relationshipsBlock;
+
+        // 5. Re‑inject into the full file
+        $newContent = preg_replace($pattern, "$1{$resourceBlock}$3", $content);
         File::put($configPath, $newContent);
 
         $this->info("✓ Updated relations for resource '{$resource}'");
@@ -216,6 +211,7 @@ class GenerateCrudRelations extends Command
 
         return Command::SUCCESS;
     }
+
 
     /**
      * Generate the relationships content string.
@@ -231,18 +227,18 @@ class GenerateCrudRelations extends Command
             $content .= "                'displayField' => '{$relation['displayField']}',\n";
             $content .= "                'searchable' => " . ($relation['searchable'] ? 'true' : 'false') . ",\n";
             $content .= "                'required' => " . ($relation['required'] ? 'true' : 'false') . ",\n";
-            
+
             if (isset($relation['depends_on'])) {
                 $content .= "                'depends_on' => '{$relation['depends_on']}',\n";
             }
-            
+
             if (isset($relation['filter_by'])) {
                 $content .= "                'filter_by' => '{$relation['filter_by']}',\n";
             }
-            
+
             $content .= "            ],\n";
         }
-        
+
         return rtrim($content, ",\n");
     }
 
@@ -263,7 +259,7 @@ class GenerateCrudRelations extends Command
     {
         $this->newLine();
         $this->line('<options=bold>Relations Summary:</>');
-        
+
         foreach ($relations as $field => $relation) {
             $this->line("• <comment>{$field}</comment> → {$relation['entity']}");
             $this->line("  Label: {$relation['labelField']}, Display: {$relation['displayField']}");
@@ -272,7 +268,7 @@ class GenerateCrudRelations extends Command
                 $this->line("  Depends on: {$relation['depends_on']} (filter by: {$relation['filter_by']})");
             }
         }
-        
+
         $this->newLine();
         $this->line('<options=bold>Next Steps:</>');
         $this->line('1. Review the generated relationships in <comment>config/crud.php</comment>');
