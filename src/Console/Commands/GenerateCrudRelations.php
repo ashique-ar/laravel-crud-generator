@@ -25,13 +25,13 @@ class GenerateCrudRelations extends Command
                             {resource : The name of the resource to generate relations for}
                             {--field= : Specific field to create relation for (e.g., category_id)}
                             {--entity= : Target entity name (e.g., categories)}
-                            {--endpoint= : API endpoint for the relation (e.g., /api/crud/categories)}
                             {--label-field=name : Field to use as label (default: name)}
                             {--value-field=id : Field to use as value (default: id)}
-                            {--type=single : Relation type: single or multiple (default: single)}
+                            {--display-field= : Field to display in tables (default: same as label-field)}
                             {--searchable : Make the relation searchable}
-                            {--nullable : Make the relation nullable}
+                            {--nullable : Make the relation optional (not required)}
                             {--depends-on= : Field this relation depends on (for dependent dropdowns)}
+                            {--filter-by= : Field to filter by when depends-on is set (default: same as depends-on)}
                             {--interactive : Interactive mode to configure relations}';
 
     /**
@@ -118,16 +118,16 @@ class GenerateCrudRelations extends Command
 
         $relation = [
             'entity' => $this->option('entity') ?: $this->guessEntityFromField($field),
-            'endpoint' => $this->option('endpoint') ?: $this->guessEndpointFromField($field),
             'labelField' => $this->option('label-field') ?: 'name',
             'valueField' => $this->option('value-field') ?: 'id',
-            'type' => $this->option('type') ?: 'single',
+            'displayField' => $this->option('display-field') ?: $this->option('label-field') ?: 'name',
             'searchable' => $this->option('searchable') ? true : false,
-            'nullable' => $this->option('nullable') ? true : false,
+            'required' => !$this->option('nullable'),
         ];
 
         if ($dependsOn = $this->option('depends-on')) {
-            $relation['dependsOn'] = $dependsOn;
+            $relation['depends_on'] = $dependsOn;
+            $relation['filter_by'] = $this->option('filter-by') ?: $dependsOn;
         }
 
         return $this->updateResourceWithRelations($resource, [$field => $relation]);
@@ -139,26 +139,30 @@ class GenerateCrudRelations extends Command
     protected function collectRelationData(string $field): ?array
     {
         $entity = $this->ask('Entity name', $this->guessEntityFromField($field));
-        $endpoint = $this->ask('API endpoint', $this->guessEndpointFromField($field));
         $labelField = $this->ask('Label field', 'name');
         $valueField = $this->ask('Value field', 'id');
-        $type = $this->choice('Relation type', ['single', 'multiple'], 'single');
+        $displayField = $this->ask('Display field (for tables)', $labelField);
         $searchable = $this->confirm('Make searchable?', true);
-        $nullable = $this->confirm('Make nullable?', true);
+        $required = $this->confirm('Is this field required?', false);
         $dependsOn = $this->ask('Depends on field (optional)');
+        $filterBy = null;
+        
+        if ($dependsOn) {
+            $filterBy = $this->ask('Filter by field', $dependsOn);
+        }
 
         $relation = [
             'entity' => $entity,
-            'endpoint' => $endpoint,
             'labelField' => $labelField,
             'valueField' => $valueField,
-            'type' => $type,
+            'displayField' => $displayField,
             'searchable' => $searchable,
-            'nullable' => $nullable,
+            'required' => $required,
         ];
 
         if ($dependsOn) {
-            $relation['dependsOn'] = $dependsOn;
+            $relation['depends_on'] = $dependsOn;
+            $relation['filter_by'] = $filterBy;
         }
 
         return $relation;
@@ -182,25 +186,25 @@ class GenerateCrudRelations extends Command
 
         $resourceBlock = $matches[2];
         
-        // Check if relations key already exists
-        if (strpos($resourceBlock, "'relations'") !== false) {
-            // Update existing relations
-            $relationsPattern = "/('relations'\s*=>\s*\[)([\s\S]*?)(\n\s*\],)/";
-            if (preg_match($relationsPattern, $resourceBlock, $relMatches)) {
-                $newRelationsContent = $this->generateRelationsContent($relations);
+        // Check if relationships key already exists
+        if (strpos($resourceBlock, "'relationships'") !== false) {
+            // Update existing relationships
+            $relationshipsPattern = "/('relationships'\s*=>\s*\[)([\s\S]*?)(\n\s*\],)/";
+            if (preg_match($relationshipsPattern, $resourceBlock, $relMatches)) {
+                $newRelationshipsContent = $this->generateRelationshipsContent($relations);
                 $resourceBlock = preg_replace(
-                    $relationsPattern,
-                    "'relations' => [\n" . $newRelationsContent . "\n        ],",
+                    $relationshipsPattern,
+                    "'relationships' => [\n" . $newRelationshipsContent . "\n        ],",
                     $resourceBlock
                 );
             }
         } else {
-            // Add relations key
-            $newRelationsContent = $this->generateRelationsContent($relations);
-            $relationsBlock = "        'relations' => [\n" . $newRelationsContent . "\n        ],\n";
+            // Add relationships key
+            $newRelationshipsContent = $this->generateRelationshipsContent($relations);
+            $relationshipsBlock = "        'relationships' => [\n" . $newRelationshipsContent . "\n        ],\n";
             
             // Insert before the closing bracket
-            $resourceBlock = rtrim($resourceBlock) . "\n" . $relationsBlock;
+            $resourceBlock = rtrim($resourceBlock) . "\n" . $relationshipsBlock;
         }
 
         // Replace the resource block in the content
@@ -214,23 +218,26 @@ class GenerateCrudRelations extends Command
     }
 
     /**
-     * Generate the relations content string.
+     * Generate the relationships content string.
      */
-    protected function generateRelationsContent(array $relations): string
+    protected function generateRelationshipsContent(array $relations): string
     {
         $content = '';
         foreach ($relations as $field => $relation) {
             $content .= "            '$field' => [\n";
             $content .= "                'entity' => '{$relation['entity']}',\n";
-            $content .= "                'endpoint' => '{$relation['endpoint']}',\n";
             $content .= "                'labelField' => '{$relation['labelField']}',\n";
             $content .= "                'valueField' => '{$relation['valueField']}',\n";
-            $content .= "                'type' => '{$relation['type']}',\n";
+            $content .= "                'displayField' => '{$relation['displayField']}',\n";
             $content .= "                'searchable' => " . ($relation['searchable'] ? 'true' : 'false') . ",\n";
-            $content .= "                'nullable' => " . ($relation['nullable'] ? 'true' : 'false') . ",\n";
+            $content .= "                'required' => " . ($relation['required'] ? 'true' : 'false') . ",\n";
             
-            if (isset($relation['dependsOn'])) {
-                $content .= "                'dependsOn' => '{$relation['dependsOn']}',\n";
+            if (isset($relation['depends_on'])) {
+                $content .= "                'depends_on' => '{$relation['depends_on']}',\n";
+            }
+            
+            if (isset($relation['filter_by'])) {
+                $content .= "                'filter_by' => '{$relation['filter_by']}',\n";
             }
             
             $content .= "            ],\n";
@@ -250,15 +257,6 @@ class GenerateCrudRelations extends Command
     }
 
     /**
-     * Guess API endpoint from field name.
-     */
-    protected function guessEndpointFromField(string $field): string
-    {
-        $entity = $this->guessEntityFromField($field);
-        return "/api/crud/{$entity}";
-    }
-
-    /**
      * Show a summary of configured relations.
      */
     protected function showRelationsSummary(array $relations): void
@@ -267,18 +265,19 @@ class GenerateCrudRelations extends Command
         $this->line('<options=bold>Relations Summary:</>');
         
         foreach ($relations as $field => $relation) {
-            $this->line("• <comment>{$field}</comment> → {$relation['entity']} ({$relation['type']})");
-            $this->line("  Endpoint: {$relation['endpoint']}");
-            if (isset($relation['dependsOn'])) {
-                $this->line("  Depends on: {$relation['dependsOn']}");
+            $this->line("• <comment>{$field}</comment> → {$relation['entity']}");
+            $this->line("  Label: {$relation['labelField']}, Display: {$relation['displayField']}");
+            $this->line("  Required: " . ($relation['required'] ? 'Yes' : 'No') . ", Searchable: " . ($relation['searchable'] ? 'Yes' : 'No'));
+            if (isset($relation['depends_on'])) {
+                $this->line("  Depends on: {$relation['depends_on']} (filter by: {$relation['filter_by']})");
             }
         }
         
         $this->newLine();
         $this->line('<options=bold>Next Steps:</>');
-        $this->line('1. Review the generated relations in <comment>config/crud.php</comment>');
+        $this->line('1. Review the generated relationships in <comment>config/crud.php</comment>');
         $this->line('2. Ensure the target resources exist and are accessible');
-        $this->line('3. Test the dynamic frontend forms with the new relations');
+        $this->line('3. Test the dynamic frontend forms with the new relationships');
         $this->newLine();
     }
 }

@@ -5,12 +5,13 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/workflow/status/ashique-ar/laravel-crud-generator/Check%20&%20fix%20styling?label=code%20style)](https://github.com/ashique-ar/laravel-crud-generator/actions?query=workflow%3A"Check+%26+fix+styling"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/ashique-ar/laravel-crud-generator.svg?style=flat-square)](https://packagist.org/packages/ashique-ar/laravel-crud-generator)
 
-A powerful, configuration-driven CRUD API generator for Laravel applications. Generate complete REST APIs with advanced features like permissions, filtering, sorting, validation, and custom business logic handlers - all through simple configuration.
+A powerful, configuration-driven CRUD API generator for Laravel applications. Generate complete REST APIs with advanced features like permissions, filtering, sorting, validation, relations management, and custom business logic handlers - all through simple configuration.
 
 ## ✨ Features
 
 - **🚀 Zero-Code CRUD APIs** - Generate complete REST APIs through configuration
-- **🔐 Permission Integration** - Built-in support for Spatie Laravel Permission
+- **� Advanced Relations Management** - Dynamic form relations with dependent dropdowns
+- **�🔐 Permission Integration** - Built-in support for Spatie Laravel Permission
 - **🎯 Custom Logic Handlers** - Extend with custom business logic easily
 - **🔍 Advanced Filtering** - Search across multiple fields with configurable operators
 - **📊 Smart Sorting** - Multi-field sorting with default configurations
@@ -49,9 +50,33 @@ This will:
 
 ## 🚀 Quick Start
 
-### 1. Configure Your First Resource
+### 1. Generate Your First Resource
 
-Edit `config/crud.php` to define your resources:
+Use the artisan command to quickly scaffold a new resource:
+
+```bash
+# Generate a basic resource
+php artisan make:crud-resource users --model=App\\Models\\User
+
+# Generate with additional options
+php artisan make:crud-resource posts --model=App\\Models\\Post --logic --resource --permissions
+```
+
+### 2. Configure Relations (New!)
+
+Add relations to enable dynamic form management:
+
+```bash
+# Interactive mode to configure relations
+php artisan crud:relations posts --interactive
+
+# Add specific relations
+php artisan crud:relations posts --field=category_id --entity=categories --type=single --searchable
+```
+
+### 3. Example Resource Configuration
+
+Here's a complete example of a resource with relations in `config/crud.php`:
 
 ```php
 <?php
@@ -60,166 +85,448 @@ return [
     // ... other configuration sections ...
     
     'resources' => [
-        'users' => [
-            'model' => App\Models\User::class,
-            'table' => 'users',
-            'fillable' => ['name', 'email', 'phone'],
-            'hidden' => ['password'],
+        'vehicles' => [
+            'model' => App\Models\Vehicle::class,
+            'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'make_id', 'model_id', 'year', 'color', 'vin'],
+            'hidden' => ['internal_notes', 'cost_price'],
             'rules' => [
                 'store' => [
                     'name' => 'required|string|max:255',
-                    'email' => 'required|email|unique:users,email',
-                    'phone' => 'nullable|string|max:20'
+                    'make_id' => 'required|exists:vehicle_makes,id',
+                    'model_id' => 'required|exists:vehicle_models,id',
                 ],
                 'update' => [
-                    'name' => 'sometimes|string|max:255',
-                    'email' => 'sometimes|email|unique:users,email,{{id}}',
-                    'phone' => 'sometimes|string|max:20'
+                    'name' => 'sometimes|required|string|max:255',
+                    'make_id' => 'sometimes|required|exists:vehicle_makes,id',
+                    'model_id' => 'sometimes|required|exists:vehicle_models,id',
                 ]
             ],
-            'search' => [
-                'enabled' => true,
-                'fields' => ['name', 'email'],
-                'operator' => 'like'
-            ],
-            'sort' => [
-                'enabled' => true,
-                'fields' => ['name', 'email', 'created_at'],
-                'default' => ['field' => 'created_at', 'direction' => 'desc']
-            ],
-            'filters' => [
-                'enabled' => true,
-                'fields' => ['status', 'role'],
-                'operators' => [
-                    'status' => 'exact',
-                    'role' => 'in'
-                ]
-            ],
-            'relations' => ['profile', 'roles'],
-            'permissions' => [
-                'enabled' => true,
-                'middleware' => 'check.crud.permission'
-            ],
-            'soft_deletes' => true,
-            'bulk_operations' => [
-                'enabled' => true,
-                'operations' => ['delete', 'restore', 'update']
-            ],
-            'api' => [
-                'paginate' => true,
+            'pagination' => [
                 'per_page' => 15,
-                'max_per_page' => 100
+                'max_per_page' => 100,
             ],
-            'middleware' => ['auth:sanctum']
-        ],
-        
-        // Example with model in subfolder
-        'user-profiles' => [
-            'model' => App\Models\User\Profile::class,
-            'fillable' => ['bio', 'avatar', 'social_links'],
-            'rules' => [
-                'store' => [
-                    'bio' => 'nullable|string|max:1000',
-                    'avatar' => 'nullable|image|max:2048'
+            'searchable_fields' => ['name'],
+            'sortable_fields' => ['id', 'name', 'created_at', 'updated_at'],
+            'filterable_fields' => ['make_id', 'model_id'],
+            'relationships' => [
+                'make_id' => [
+                    'entity' => 'vehicle-makes',
+                    'labelField' => 'name',
+                    'valueField' => 'id',
+                    'displayField' => 'name',
+                    'searchable' => true,
+                    'required' => true,
                 ],
-                'update' => [
-                    'bio' => 'sometimes|string|max:1000',
-                    'avatar' => 'sometimes|image|max:2048'
-                ]
-            ],
-            'search' => [
-                'enabled' => true,
-                'fields' => ['bio']
-            ]
-        ],
-        
-        // Example with full custom namespace
-        'vehicle-classes' => [
-            'model' => App\Models\Vehicle\VehicleClass::class,
-            'table' => 'vehicle_classes',
-            'fillable' => ['name', 'description', 'is_active'],
-            'rules' => [
-                'store' => [
-                    'name' => 'required|string|max:255|unique:vehicle_classes,name',
-                    'description' => 'nullable|string|max:1000',
-                    'is_active' => 'boolean',
+                'model_id' => [
+                    'entity' => 'vehicle-models',
+                    'labelField' => 'name',
+                    'valueField' => 'id',
+                    'displayField' => 'name',
+                    'searchable' => true,
+                    'required' => true,
+                    'depends_on' => 'make_id',
+                    'filter_by' => 'make_id',
                 ],
-                'update' => [
-                    'name' => 'sometimes|string|max:255|unique:vehicle_classes,name,{{id}}',
-                    'description' => 'sometimes|string|max:1000',
-                    'is_active' => 'sometimes|boolean',
-                ]
             ],
-            'search' => [
-                'enabled' => true,
-                'fields' => ['name', 'description'],
-                'operator' => 'like'
-            ],
-            'sort' => [
-                'enabled' => true,
-                'fields' => ['name', 'created_at'],
-                'default' => ['field' => 'name', 'direction' => 'asc']
-            ],
-            'filters' => [
-                'enabled' => true,
-                'fields' => ['is_active'],
-                'operators' => [
-                    'is_active' => 'exact'
-                ]
-            ],
-            'bulk_operations' => [
-                'enabled' => true,
-                'operations' => ['delete', 'update']
-            ]
-        ]
-    ]
+            'soft_deletes' => false,
+        ],
+    ],
 ];
 ```
 
-### 2. Register Routes
+### 4. Register API Routes
 
-Add the CRUD routes to your `routes/api.php` file:
+Add to your `routes/api.php` or service provider:
 
 ```php
 use AshiqueAr\LaravelCrudGenerator\Facades\CrudGenerator;
 
-// Register all CRUD routes with prefix and middleware
+// Register all CRUD routes with middleware
 CrudGenerator::registerRoutes('api/v1', ['auth:sanctum']);
+
+// Or register specific resources
+CrudGenerator::registerRoutes('api/v1', ['auth:sanctum'], ['users', 'posts']);
 ```
 
-### 3. Generate Permissions
+Your API endpoints will be available at:
+- `GET /api/v1/vehicles` - List vehicles with pagination, filtering, sorting
+- `POST /api/v1/vehicles` - Create a new vehicle
+- `GET /api/v1/vehicles/{id}` - Get a specific vehicle
+- `PUT /api/v1/vehicles/{id}` - Update a vehicle
+- `DELETE /api/v1/vehicles/{id}` - Delete a vehicle
+- `GET /api/v1/vehicles/docs` - API documentation for vehicles resource
+
+## 🛠️ Artisan Commands
+
+### Resource Management
 
 ```bash
-php artisan crud:permissions
+# Generate a new CRUD resource
+php artisan make:crud-resource {name} --model={Model}
+
+# Examples:
+php artisan make:crud-resource users --model=App\\Models\\User
+php artisan make:crud-resource posts --model=App\\Models\\Blog\\Post --logic --resource --permissions
+php artisan make:crud-resource website_settings --model=App\\Models\\Website\\WebsiteSetting
 ```
 
-### 4. Start Using Your API
+**Options:**
+- `--model=` : Specify the model class
+- `--logic` : Generate a custom logic class
+- `--resource` : Generate an API resource class
+- `--permissions` : Generate permissions for this resource
+- `--force` : Overwrite existing files
 
-Your CRUD endpoints are now available:
+### Relations Management
 
 ```bash
-# List users with pagination, search, and sorting
-GET /api/v1/users?search=john&sort=name&direction=asc&page=1
+# Interactive mode to configure relationships
+php artisan crud:relations {resource} --interactive
 
-# Create a new user
-POST /api/v1/users
-{
-    "name": "John Doe",
-    "email": "john@example.com"
+# Add a specific relationship
+php artisan crud:relations {resource} --field={field} --entity={entity}
+
+# Examples:
+php artisan crud:relations vehicles --interactive
+php artisan crud:relations posts --field=category_id --entity=categories --searchable --nullable
+php artisan crud:relations vehicles --field=model_id --entity=vehicle-models --depends-on=make_id --filter-by=make_id
+```
+
+**Options:**
+- `--field=` : Field name (e.g., category_id)
+- `--entity=` : Target entity name (e.g., categories)
+- `--label-field=` : Label field (default: name)
+- `--value-field=` : Value field (default: id)
+- `--display-field=` : Display field for tables (default: same as label-field)
+- `--searchable` : Make the relationship searchable
+- `--nullable` : Make the relationship optional (not required)
+- `--depends-on=` : Field this relationship depends on
+- `--filter-by=` : Field to filter by when depends-on is set
+- `--interactive` : Interactive mode
+
+### Custom Logic
+
+```bash
+# Generate custom logic class
+php artisan make:crud-logic {name} --model={Model}
+
+# Examples:
+php artisan make:crud-logic UserLogic --model=App\\Models\\User
+php artisan make:crud-logic PostLogic --model=App\\Models\\Post --force
+```
+
+### Permissions
+
+```bash
+# Generate permissions for resources
+php artisan crud:permissions --resource={resource}
+
+# Examples:
+php artisan crud:permissions --resource=users
+php artisan crud:permissions --resource=posts
+```
+
+### Installation & Setup
+
+```bash
+# Install the CRUD generator
+php artisan crud:install
+
+# This will:
+# - Publish config/crud.php
+# - Set up middleware
+# - Register routes (optional)
+# - Generate permissions (optional)
+```
+
+## 🔗 Relationships Configuration
+
+The relationships system allows you to create dynamic forms with dependent dropdowns and complex relationships. This unified approach handles both Laravel Eloquent relationships and form field relationships in one configuration.
+
+### Relationship Types
+
+1. **Single Select** - For foreign key relationships (belongs to)
+2. **Multiple Select** - For many-to-many relationships (coming soon)
+3. **Dependent Dropdowns** - Where one field depends on another
+
+### Relationship Configuration Structure
+
+```php
+'relationships' => [
+    'field_name' => [
+        'entity' => 'target-entity-name',        // Kebab-case entity name
+        'labelField' => 'name',                  // Field to display as label
+        'valueField' => 'id',                    // Field to use as value
+        'displayField' => 'name',                // Field to show in tables/lists
+        'searchable' => true,                    // Enable search in dropdown
+        'required' => false,                     // Whether field is required
+        'depends_on' => 'parent_field',          // Optional: parent field for dependencies
+        'filter_by' => 'parent_field',           // Optional: filter records by parent field
+    ],
+],
+```
+
+### Real-World Examples
+
+#### Vehicle Management System
+
+```php
+'vehicles' => [
+    'model' => App\Models\Vehicle::class,
+    'fillable' => ['name', 'class_id', 'make_id', 'model_id', 'year', 'color', 'vin'],
+    'hidden' => ['internal_notes', 'cost_price'],
+    'relationships' => [
+        'class_id' => [
+            'entity' => 'vehicle-classes',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => true,
+        ],
+        'make_id' => [
+            'entity' => 'vehicle-makes',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => true,
+        ],
+        'model_id' => [
+            'entity' => 'vehicle-models',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => true,
+            'depends_on' => 'make_id',
+            'filter_by' => 'make_id',
+        ],
+    ],
+],
+```
+
+#### Blog Post with Tags
+
+```php
+'posts' => [
+    'model' => App\Models\Post::class,
+    'fillable' => ['title', 'content', 'category_id', 'slug', 'excerpt', 'featured_image'],
+    'hidden' => ['internal_notes', 'admin_notes'],
+    'relationships' => [
+        'category_id' => [
+            'entity' => 'categories',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => true,
+        ],
+        'author_id' => [
+            'entity' => 'users',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'email',
+            'searchable' => true,
+            'required' => true,
+        ],
+    ],
+],
+```
+
+### Frontend Integration
+
+Your dynamic frontend can read these configurations and automatically:
+
+1. **Generate appropriate form controls** based on relationship configuration
+2. **Fetch options** from the appropriate endpoints (`/api/crud/{entity}`)
+3. **Handle dependent dropdowns** by watching parent field changes
+4. **Support search functionality** in dropdowns
+5. **Validate required/optional** fields
+6. **Display appropriate fields** in tables and lists
+
+Example frontend usage:
+```javascript
+// Fetch resource configuration
+const config = await fetch('/api/v1/vehicles/config');
+const relationships = config.relationships;
+
+// Generate form fields based on relationships
+Object.keys(relationships).forEach(fieldName => {
+    const relationship = relationships[fieldName];
+    
+    // Create select field
+    createSelectField(fieldName, relationship);
+    
+    // Handle dependencies
+    if (relationship.depends_on) {
+        watchFieldChanges(relationship.depends_on, fieldName, relationship.filter_by);
+    }
+});
+
+// Example function to fetch dependent options
+async function fetchDependentOptions(entity, filterBy, filterValue) {
+    const response = await fetch(`/api/crud/${entity}?filter[${filterBy}]=${filterValue}`);
+    return response.json();
 }
+```
 
-# Get a specific user
-GET /api/v1/users/1
+## 📊 API Endpoints
 
-# Update a user
-PUT /api/v1/users/1
-{
-    "name": "John Smith",
-    "email": "johnsmith@example.com"
-}
+All resources automatically get the following endpoints:
 
-# Delete a user
-DELETE /api/v1/users/1
+### Standard CRUD Operations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/{resource}` | List all items with pagination, filtering, sorting |
+| `POST` | `/api/v1/{resource}` | Create a new item |
+| `GET` | `/api/v1/{resource}/{id}` | Get a specific item |
+| `PUT` | `/api/v1/{resource}/{id}` | Update an item |
+| `DELETE` | `/api/v1/{resource}/{id}` | Delete an item |
+
+### Additional Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/{resource}/config` | Get resource configuration (including relations) |
+| `GET` | `/api/v1/{resource}/docs` | API documentation for this resource |
+| `POST` | `/api/v1/{resource}/bulk` | Bulk operations (delete, update) |
+| `POST` | `/api/v1/{resource}/{id}/restore` | Restore soft-deleted item |
+
+### Query Parameters
+
+#### Pagination
+```
+GET /api/v1/users?page=2&per_page=20
+```
+
+#### Search
+```
+GET /api/v1/users?search=john
+GET /api/v1/users?search[name]=john&search[email]=doe
+```
+
+#### Sorting
+```
+GET /api/v1/users?sort=name&direction=asc
+GET /api/v1/users?sort[]=name:asc&sort[]=created_at:desc
+```
+
+#### Filtering
+```
+GET /api/v1/users?filter[status]=active
+GET /api/v1/users?filter[role]=admin,manager
+```
+
+#### Including Relations
+```
+GET /api/v1/users?include=profile,roles
+```
+
+## ⚙️ Configuration Options
+
+### Global Configuration
+
+Edit `config/crud.php` to customize global settings:
+
+```php
+return [
+    'api' => [
+        'pagination' => [
+            'enabled' => true,
+            'per_page' => 15,
+            'max_per_page' => 100,
+        ],
+        'prefix' => 'api/crud',
+        'documentation' => [
+            'enabled' => true,
+            'title' => 'CRUD API Documentation',
+            'version' => '1.0.0',
+        ],
+    ],
+    
+    'permissions' => [
+        'enabled' => true,
+        'guard' => 'web',
+        'format' => '{action}-{resource}', // view-users, create-posts, etc.
+        'actions' => ['view', 'create', 'edit', 'delete'],
+        'super_admin_role' => 'super-admin',
+    ],
+    
+    'search' => [
+        'default_operator' => 'like',
+        'case_sensitive' => false,
+        'operators' => [
+            'like' => 'LIKE',
+            'exact' => '=',
+            'not_equal' => '!=',
+            'greater_than' => '>',
+            'less_than' => '<',
+            // ... more operators
+        ],
+    ],
+    
+    'resources' => [
+        // Your resource definitions
+    ],
+    
+    'add_new_resource_to' => 'bottom', // or 'top'
+];
+```
+
+### Resource Configuration Options
+
+Each resource supports these configuration options:
+
+```php
+'resource-name' => [
+    // Core settings
+    'model' => App\Models\ResourceModel::class,
+    'middleware' => ['auth:sanctum', 'crud.permissions'],
+    
+    'fillable' => [...],
+    'hidden' => [...],
+    // Validation rules
+    'rules' => [
+        'store' => [...],
+        'update' => [...],
+    ],
+    
+    // Pagination settings
+    'pagination' => [
+        'per_page' => 15,
+        'max_per_page' => 100,
+    ],
+    
+    // Search configuration
+    'searchable_fields' => ['name', 'email'],
+    
+    // Sorting configuration
+    'sortable_fields' => ['id', 'name', 'created_at', 'updated_at'],
+    
+    // Filtering configuration
+    'filterable_fields' => ['status', 'category_id'],
+    
+    // Relationships for dynamic forms and Eloquent relationships
+    'relationships' => [
+        'category_id' => [
+            'entity' => 'categories',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => false,
+            'depends_on' => null,
+            'filter_by' => null,
+        ],
+        // See relationships section for more details
+    ],
+    
+    // Soft deletes support
+    'soft_deletes' => false,
+],
 ```
 
 ## 📖 Available Endpoints
@@ -357,7 +664,8 @@ Then update your configuration:
 'users' => [
     'model' => App\Models\User::class,
     'logic' => App\Services\Crud\UserLogic::class,
-    'fillable' => ['name', 'email', 'created_by'],
+    'fillable' => ['name', 'email', 'phone'],
+    'hidden' => ['password'],
     'rules' => [
         'store' => [
             'name' => 'required|string|max:255',
@@ -520,6 +828,228 @@ return [
 
     // Resource definitions
     'resources' => [
+        // Your resource configurations here
+    ],
+
+    // Where to add new resources when using make:crud-resource command
+    'add_new_resource_to' => 'bottom', // 'top' or 'bottom'
+];
+```
+
+## 🧪 Testing
+
+The package includes comprehensive tests. Run them using:
+
+```bash
+# Run all tests
+./vendor/bin/phpunit
+
+# Run with coverage
+./vendor/bin/phpunit --coverage-text
+
+# Run specific test file
+./vendor/bin/phpunit tests/Feature/CrudApiTest.php
+```
+
+### Example Test
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use App\Models\User;
+
+class UserCrudTest extends TestCase
+{
+    public function test_can_list_users()
+    {
+        $users = User::factory()->count(5)->create();
+        
+        $response = $this->get('/api/v1/users');
+        
+        $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'data' => [
+                        '*' => ['id', 'name', 'email', 'created_at', 'updated_at']
+                    ],
+                    'meta' => ['current_page', 'total', 'per_page']
+                ]);
+    }
+
+    public function test_can_create_user()
+    {
+        $userData = [
+            'name' => 'John Doe',
+            'email' => 'john@example.com'
+        ];
+
+        $response = $this->post('/api/v1/users', $userData);
+
+        $response->assertStatus(201)
+                ->assertJson(['data' => $userData]);
+                
+        $this->assertDatabaseHas('users', $userData);
+    }
+}
+```
+
+## 🔒 Security
+
+### Permission Middleware
+
+The package includes built-in permission checking:
+
+```php
+// Applied automatically to all CRUD routes
+'middleware' => ['auth:sanctum', 'crud.permissions']
+```
+
+This checks for permissions like:
+- `view-users` for GET requests
+- `create-users` for POST requests  
+- `edit-users` for PUT/PATCH requests
+- `delete-users` for DELETE requests
+
+### Validation
+
+All requests are automatically validated using the rules defined in your configuration:
+
+```php
+'rules' => [
+    'store' => [
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+    ],
+    'update' => [
+        'name' => 'sometimes|string|max:255',
+        'email' => 'sometimes|email|unique:users,email,{{id}}',
+    ]
+]
+```
+
+Use `{{id}}` in update rules to exclude the current record from unique checks.
+
+### Mass Assignment Protection
+
+Only fields defined in `fillable` arrays are allowed for mass assignment, providing protection against mass assignment vulnerabilities.
+
+## 📚 Examples
+
+### Complete Vehicle Management System
+
+See `examples/vehicle-crud-config.php` for a complete example of a vehicle management system with:
+- Vehicle classes, makes, models
+- Dependent dropdowns (model depends on make)
+- Complex relationships
+- Full CRUD operations
+
+### Blog System
+
+```php
+'resources' => [
+    'categories' => [
+        'model' => App\Models\Category::class,
+        'fillable' => ['name', 'slug', 'description'],
+        'hidden' => ['internal_notes'],
+        'rules' => [
+            'store' => ['name' => 'required|string|max:255|unique:categories'],
+            'update' => ['name' => 'sometimes|required|string|max:255|unique:categories,name,{{id}}'],
+        ],
+        'searchable_fields' => ['name'],
+        'sortable_fields' => ['id', 'name', 'created_at'],
+    ],
+    
+    'posts' => [
+        'model' => App\Models\Post::class,
+        'fillable' => ['title', 'content', 'category_id', 'status', 'slug', 'excerpt', 'featured_image'],
+        'hidden' => ['internal_notes', 'admin_notes'],
+        'rules' => [
+            'store' => [
+                'title' => 'required|string|max:255',
+                'content' => 'required|string',
+                'category_id' => 'required|exists:categories,id',
+                'status' => 'required|in:draft,published',
+            ],
+            'update' => [
+                'title' => 'sometimes|required|string|max:255',
+                'content' => 'sometimes|required|string',
+                'category_id' => 'sometimes|required|exists:categories,id',
+                'status' => 'sometimes|required|in:draft,published',
+            ],
+        ],
+        'searchable_fields' => ['title', 'content'],
+        'sortable_fields' => ['id', 'title', 'created_at', 'updated_at'],
+        'filterable_fields' => ['status', 'category_id'],
+        'relationships' => [
+            'category_id' => [
+                'entity' => 'categories',
+                'labelField' => 'name',
+                'valueField' => 'id',
+                'displayField' => 'name',
+                'searchable' => true,
+                'required' => true,
+            ],
+        ],
+        'soft_deletes' => true,
+    ],
+],
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/ashique-ar/laravel-crud-generator.git
+
+# Install dependencies
+composer install
+
+# Run tests
+./vendor/bin/phpunit
+
+# Check code style
+./vendor/bin/pint --test
+
+# Fix code style
+./vendor/bin/pint
+```
+
+## 📄 License
+
+The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+
+## 🆘 Support
+
+- **Documentation**: This README and inline documentation
+- **Issues**: [GitHub Issues](https://github.com/ashique-ar/laravel-crud-generator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ashique-ar/laravel-crud-generator/discussions)
+
+## 🗺️ Roadmap
+
+- [ ] GraphQL support
+- [ ] Real-time updates with WebSockets
+- [ ] Advanced caching strategies
+- [ ] Export functionality (CSV, Excel, PDF)
+- [ ] Import functionality with validation
+- [ ] Audit logging
+- [ ] API rate limiting per resource
+- [ ] Resource versioning
+- [ ] Custom field types and validation rules
+
+---
+
+**Made with ❤️ by [Ashique AR](https://github.com/ashique-ar)**
+        ],
+    ],
+
+    // Resource definitions
+    'resources' => [
         // Your resources here...
     ]
 ];
@@ -573,18 +1103,29 @@ Each resource supports the following configuration options:
     ],
     
     // Filtering configuration
-    'filters' => [
-        'enabled' => true,
-        'fields' => ['status', 'category_id', 'is_active'],
-        'operators' => [
-            'status' => 'exact',
-            'category_id' => 'in',
-            'is_active' => 'exact'
-        ]
-    ],
+    'filterable_fields' => ['status', 'category_id', 'is_active'],
     
-    // Relationships to eager load
-    'relations' => ['category', 'tags', 'author'],
+    // Relationships configuration (handles both form relations and Eloquent relationships)
+    'relationships' => [
+        'user_id' => [
+            'entity' => 'users',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'email',
+            'searchable' => true,
+            'required' => true,
+        ],
+        'category_id' => [
+            'entity' => 'categories',
+            'labelField' => 'name',
+            'valueField' => 'id',
+            'displayField' => 'name',
+            'searchable' => true,
+            'required' => false,
+            'depends_on' => 'parent_category_id',
+            'filter_by' => 'parent_id',
+        ],
+    ],
     
     // Permission settings for this resource
     'permissions' => [

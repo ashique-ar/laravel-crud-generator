@@ -7,6 +7,8 @@ return [
         'vehicles' => [
             'model' => 'App\\Models\\Vehicle',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'class_id', 'fuel_type_id', 'category_id', 'make_id', 'model_id', 'year', 'color', 'vin', 'license_plate'],
+            'hidden' => ['internal_notes', 'cost_price', 'purchase_date_internal'],
             'rules' => [
                 'store' => [
                     'name' => 'required|string|max:255',
@@ -32,55 +34,50 @@ return [
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at', 'updated_at'],
             'filterable_fields' => ['class_id', 'fuel_type_id', 'category_id', 'make_id'],
-            'relations' => [
+            'relationships' => [
                 'class_id' => [
                     'entity' => 'vehicle-classes',
-                    'endpoint' => '/api/crud/vehicle-classes',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
+                    'required' => true,
                 ],
                 'fuel_type_id' => [
                     'entity' => 'vehicle-fuel-types',
-                    'endpoint' => '/api/crud/vehicle-fuel-types',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
+                    'required' => true,
                 ],
                 'category_id' => [
                     'entity' => 'vehicle-categories',
-                    'endpoint' => '/api/crud/vehicle-categories',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
+                    'required' => true,
                 ],
                 'make_id' => [
                     'entity' => 'vehicle-makes',
-                    'endpoint' => '/api/crud/vehicle-makes',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
+                    'required' => true,
                 ],
                 'model_id' => [
                     'entity' => 'vehicle-models',
-                    'endpoint' => '/api/crud/vehicle-models',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
-                    'dependsOn' => 'make_id', // Model depends on make selection
+                    'required' => true,
+                    'depends_on' => 'make_id',
+                    'filter_by' => 'make_id',
                 ],
             ],
-            'relationships' => ['vehicleClass', 'fuelType', 'category', 'make', 'model'], // Laravel Eloquent relationships
             'soft_deletes' => false,
         ],
 
@@ -88,58 +85,64 @@ return [
         'vehicle-classes' => [
             'model' => 'App\\Models\\VehicleClass',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'description'],
+            'hidden' => [],
             'rules' => [
                 'store' => ['name' => 'required|string|max:255|unique:vehicle_classes'],
                 'update' => ['name' => 'sometimes|required|string|max:255|unique:vehicle_classes,name,{{id}}'],
             ],
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at'],
-            'relations' => [],
             'relationships' => [],
         ],
 
         'vehicle-fuel-types' => [
             'model' => 'App\\Models\\VehicleFuelType',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'description'],
+            'hidden' => [],
             'rules' => [
                 'store' => ['name' => 'required|string|max:255|unique:vehicle_fuel_types'],
                 'update' => ['name' => 'sometimes|required|string|max:255|unique:vehicle_fuel_types,name,{{id}}'],
             ],
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at'],
-            'relations' => [],
             'relationships' => [],
         ],
 
         'vehicle-categories' => [
             'model' => 'App\\Models\\VehicleCategory',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'description'],
+            'hidden' => [],
             'rules' => [
                 'store' => ['name' => 'required|string|max:255|unique:vehicle_categories'],
                 'update' => ['name' => 'sometimes|required|string|max:255|unique:vehicle_categories,name,{{id}}'],
             ],
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at'],
-            'relations' => [],
             'relationships' => [],
         ],
 
         'vehicle-makes' => [
             'model' => 'App\\Models\\VehicleMake',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'description', 'logo'],
+            'hidden' => ['internal_code'],
             'rules' => [
                 'store' => ['name' => 'required|string|max:255|unique:vehicle_makes'],
                 'update' => ['name' => 'sometimes|required|string|max:255|unique:vehicle_makes,name,{{id}}'],
             ],
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at'],
-            'relations' => [],
             'relationships' => [],
         ],
 
         'vehicle-models' => [
             'model' => 'App\\Models\\VehicleModel',
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => ['name', 'make_id', 'year_start', 'year_end'],
+            'hidden' => ['internal_code'],
             'rules' => [
                 'store' => [
                     'name' => 'required|string|max:255',
@@ -153,18 +156,16 @@ return [
             'searchable_fields' => ['name'],
             'sortable_fields' => ['id', 'name', 'created_at'],
             'filterable_fields' => ['make_id'],
-            'relations' => [
+            'relationships' => [
                 'make_id' => [
                     'entity' => 'vehicle-makes',
-                    'endpoint' => '/api/crud/vehicle-makes',
                     'labelField' => 'name',
                     'valueField' => 'id',
-                    'type' => 'single',
+                    'displayField' => 'name',
                     'searchable' => true,
-                    'nullable' => false,
+                    'required' => true,
                 ],
             ],
-            'relationships' => ['make'],
         ],
     ],
 

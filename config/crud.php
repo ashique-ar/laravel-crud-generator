@@ -148,28 +148,27 @@ return [
     |         'fields' => ['name', 'email', 'created_at'],
     |         'default' => ['field' => 'created_at', 'direction' => 'desc']
     |     ],
-    |     'relations' => [
+    |     'relationships' => [
     |         'category_id' => [
     |             'entity' => 'categories',
-    |             'endpoint' => '/api/crud/categories',
     |             'labelField' => 'name',
     |             'valueField' => 'id',
-    |             'type' => 'single', // or 'multiple'
+    |             'displayField' => 'name',
     |             'searchable' => true,
-    |             'nullable' => true,
-    |             'dependsOn' => null // Optional: for dependent dropdowns
+    |             'required' => true,
     |         ],
-    |         'tags' => [
-    |             'entity' => 'tags',
-    |             'endpoint' => '/api/crud/tags',
+    |         'user_id' => [
+    |             'entity' => 'users',
     |             'labelField' => 'name',
     |             'valueField' => 'id',
-    |             'type' => 'multiple',
+    |             'displayField' => 'email',
     |             'searchable' => true,
-    |             'nullable' => true
+    |             'required' => false,
+    |             'depends_on' => 'department_id',
+    |             'filter_by' => 'department_id'
     |         ]
     |     ],
-    |     'relationships' => ['profile', 'roles'], // Laravel Eloquent relationships
+    |     'relationships' => ['profile', 'roles'], // Laravel Eloquent relationships for eager loading
     |     'permissions' => [
     |         'enabled' => true,
     |         'middleware' => 'check.crud.permission'
@@ -208,18 +207,16 @@ return [
         //         'enabled' => true,
         //         'fields' => ['name', 'email']
         //     ],
-        //     'relations' => [
+        //     'relationships' => [
         //         'role_id' => [
         //             'entity' => 'roles',
-        //             'endpoint' => '/api/crud/roles',
         //             'labelField' => 'name',
         //             'valueField' => 'id',
-        //             'type' => 'single',
+        //             'displayField' => 'name',
         //             'searchable' => true,
-        //             'nullable' => true
+        //             'required' => false
         //         ]
         //     ],
-        //     'relationships' => ['profile', 'roles'], // Laravel Eloquent relationships
         //     'permissions' => ['enabled' => true],
         // ],
     ],

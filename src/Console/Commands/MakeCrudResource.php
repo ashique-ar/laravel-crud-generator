@@ -95,25 +95,26 @@ class MakeCrudResource extends Command
         $resourceConfig = [
             'model' => $this->getFullModelNamespace($model),
             'middleware' => ['auth:sanctum', 'crud.permissions'],
+            'fillable' => [],
+            'hidden' => [],
             'rules' => ['store' => [], 'update' => []],
             'pagination' => ['per_page' => 15, 'max_per_page' => 100],
             'searchable_fields' => [],
             'sortable_fields' => ['id', 'created_at', 'updated_at'],
             'filterable_fields' => [],
-            'relations' => [
+            'relationships' => [
                 // Example:
                 // 'category_id' => [
                 //     'entity' => 'categories',
-                //     'endpoint' => '/api/crud/categories',
                 //     'labelField' => 'name',
                 //     'valueField' => 'id',
-                //     'type' => 'single', // or 'multiple'
+                //     'displayField' => 'name',
                 //     'searchable' => true,
-                //     'nullable' => true,
-                //     'dependsOn' => null // Optional: for dependent dropdowns
+                //     'required' => false,
+                //     'depends_on' => null,
+                //     'filter_by' => null,
                 // ],
             ],
-            'relationships' => [], // Laravel Eloquent relationships (for eager loading)
             'soft_deletes' => false,
         ];
 
