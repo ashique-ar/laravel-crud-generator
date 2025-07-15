@@ -176,56 +176,53 @@ class GenerateCrudRelations extends Command
         $configPath = config_path('crud.php');
         $content = File::get($configPath);
 
-        // 1) First, extract just the block for our resource
-        $resourcePattern = sprintf(
-            '/(%s\'\s*=>\s*\[\s*)(.*?)(\n\s*\],\s*\n)/s',
-            preg_quote("'{$resource}'", '/')
-        );
+        // Match the entire resource block, closing on the line with exactly 8 spaces + ],
+        // so nested arrays (like middleware) won’t prematurely terminate the match.
+        $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\n {8}\],)/";
 
-        if (!preg_match($resourcePattern, $content, $m)) {
+        if (!preg_match($pattern, $content, $matches)) {
             $this->error("Could not find resource '{$resource}' in configuration.");
             return Command::FAILURE;
         }
 
-        $resourceBlock = $m[2];
+        $resourceBlock = $matches[2];
 
-        // 2) Now look for a _top‑level_ relationships key inside that block
-        //    We anchor to the left margin of the resource block, not inside middleware.
-        $relsPattern = '/^[ \t]*\'relationships\'\s*=>\s*\[\s*(.*?)\s*\],/ms';
+        // If there's already a relationships block (indented 12 spaces), replace it.
+        if (strpos($resourceBlock, "'relationships'") !== false) {
+            $relationshipsPattern =
+                "/( {12}'relationships'\s*=>\s*\[)([\s\S]*?)(\n {12}\],)/";
 
-        if (preg_match($relsPattern, $resourceBlock)) {
-            // Replace the entire relationships array
-            $newRels = $this->generateRelationshipsContent($relations);
-            $resourceBlock = preg_replace(
-                $relsPattern,
-                "    'relationships' => [\n{$newRels}\n    ],",
-                $resourceBlock
-            );
+            if (preg_match($relationshipsPattern, $resourceBlock, $relMatches)) {
+                $newContent = $this->generateRelationshipsContent($relations);
+
+                $resourceBlock = preg_replace(
+                    $relationshipsPattern,
+                    "            'relationships' => [\n"    // 12 spaces
+                    . $newContent
+                    . "\n            ],",                 // 12 spaces
+                    $resourceBlock
+                );
+            }
         } else {
-            // If there's no relationships key yet, insert it right after the top of the resource
-            $newRels = $this->generateRelationshipsContent($relations);
-            $resourceBlock = preg_replace(
-                '/^/',
-                "    'relationships' => [\n{$newRels}\n    ],\n",
-                $resourceBlock,
-                1
-            );
+            // No existing relationships: append them at 12 spaces, just before the resource's closing ],
+            $newContent = $this->generateRelationshipsContent($relations);
+            $relationshipsBlock =
+                "            'relationships' => [\n"  // 12 spaces
+                . $newContent
+                . "\n            ],\n";               // 12 spaces
+
+            $resourceBlock = rtrim($resourceBlock) . "\n" . $relationshipsBlock;
         }
 
-        // 3) Stitch it back into the full config
-        $newContent = preg_replace(
-            $resourcePattern,
-            '$1' . $resourceBlock . '$3',
-            $content
-        );
+        // Reassemble and write back
+        $newFile = preg_replace($pattern, "$1{$resourceBlock}$3", $content);
+        File::put($configPath, $newFile);
 
-        File::put($configPath, $newContent);
         $this->info("✓ Updated relations for resource '{$resource}'");
         $this->showRelationsSummary($relations);
 
         return Command::SUCCESS;
     }
-
 
     /**
      * Generate the relationships content string.
