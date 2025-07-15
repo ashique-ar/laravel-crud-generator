@@ -176,36 +176,41 @@ class GenerateCrudRelations extends Command
         $path = config_path('crud.php');
         $content = File::get($path);
 
-        // 1) Grab the entire resource[...] block, from 'resource' => [   through the next ],
-        $resourcePattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\]\s*,)/";
-
-        if (!preg_match($resourcePattern, $content, $m)) {
+        // 1) Extract the whole 'resource' => [ ... ],
+        $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\]\s*,)/";
+        if (!preg_match($pattern, $content, $m)) {
             $this->error("Resource '{$resource}' not found.");
             return Command::FAILURE;
         }
 
         $body = $m[2];
 
-        // 2) Remove any existing relationships => [ ... ],
-        $body = preg_replace(
-            "/'relationships'\s*=>\s*\[[^\]]*\]\s*,?/",
-            '',
-            $body
-        );
+        // 2) Remove any old relationships block
+        $body = preg_replace("/'relationships'\s*=>\s*\[[^\]]*\]\s*,?/", '', $body);
 
-        // 3) Build the new relationships block (no fixed indentation assumed)
+        // 3) Build the fresh relationships snippet
         $relLines = $this->generateRelationshipsContent($relations);
         $newRelBlock = "\n'relationships' => [\n"
             . rtrim($relLines, "\n")
             . "\n],\n";
 
-        // 4) Append it to the resource body
-        $body = rtrim($body) . $newRelBlock;
+        // 4) If there's a middleware key, insert *after* its closing ],
+        //    otherwise fall back to appending at the end of the resource.
+        if (strpos($body, "'middleware'") !== false) {
+            $body = preg_replace(
+                // match 'middleware' => [ ... ],
+                "/('middleware'\s*=>\s*\[[^\]]*\]\s*,)/",
+                "$1" . $newRelBlock,
+                $body,
+                1
+            );
+        } else {
+            $body = rtrim($body) . $newRelBlock;
+        }
 
-        // 5) Put the updated block back into the full file
+        // 5) Put it back into the file
         $replacement = $m[1] . $body . $m[3];
-        $newContent = preg_replace($resourcePattern, $replacement, $content);
-
+        $newContent = preg_replace($pattern, $replacement, $content);
         File::put($path, $newContent);
 
         $this->info("✓ Relations for '{$resource}' updated.");
@@ -213,6 +218,7 @@ class GenerateCrudRelations extends Command
 
         return Command::SUCCESS;
     }
+
 
 
 
