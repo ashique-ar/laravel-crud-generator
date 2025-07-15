@@ -148,7 +148,28 @@ return [
     |         'fields' => ['name', 'email', 'created_at'],
     |         'default' => ['field' => 'created_at', 'direction' => 'desc']
     |     ],
-    |     'relations' => ['profile', 'roles'],
+    |     'relations' => [
+    |         'category_id' => [
+    |             'entity' => 'categories',
+    |             'endpoint' => '/api/crud/categories',
+    |             'labelField' => 'name',
+    |             'valueField' => 'id',
+    |             'type' => 'single', // or 'multiple'
+    |             'searchable' => true,
+    |             'nullable' => true,
+    |             'dependsOn' => null // Optional: for dependent dropdowns
+    |         ],
+    |         'tags' => [
+    |             'entity' => 'tags',
+    |             'endpoint' => '/api/crud/tags',
+    |             'labelField' => 'name',
+    |             'valueField' => 'id',
+    |             'type' => 'multiple',
+    |             'searchable' => true,
+    |             'nullable' => true
+    |         ]
+    |     ],
+    |     'relationships' => ['profile', 'roles'], // Laravel Eloquent relationships
     |     'permissions' => [
     |         'enabled' => true,
     |         'middleware' => 'check.crud.permission'
@@ -187,6 +208,18 @@ return [
         //         'enabled' => true,
         //         'fields' => ['name', 'email']
         //     ],
+        //     'relations' => [
+        //         'role_id' => [
+        //             'entity' => 'roles',
+        //             'endpoint' => '/api/crud/roles',
+        //             'labelField' => 'name',
+        //             'valueField' => 'id',
+        //             'type' => 'single',
+        //             'searchable' => true,
+        //             'nullable' => true
+        //         ]
+        //     ],
+        //     'relationships' => ['profile', 'roles'], // Laravel Eloquent relationships
         //     'permissions' => ['enabled' => true],
         // ],
     ],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AshiqueAr\LaravelCrudGenerator;
 
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\GenerateCrudPermissions;
+use AshiqueAr\LaravelCrudGenerator\Console\Commands\GenerateCrudRelations;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\InstallCrudGenerator;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\MakeCrudLogic;
 use AshiqueAr\LaravelCrudGenerator\Console\Commands\MakeCrudResource;
@@ -82,6 +83,7 @@ class CrudGeneratorServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 GenerateCrudPermissions::class,
+                GenerateCrudRelations::class,
                 MakeCrudLogic::class,
                 MakeCrudResource::class,
                 InstallCrudGenerator::class,

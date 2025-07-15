@@ -100,7 +100,20 @@ class MakeCrudResource extends Command
             'searchable_fields' => [],
             'sortable_fields' => ['id', 'created_at', 'updated_at'],
             'filterable_fields' => [],
-            'relationships' => [],
+            'relations' => [
+                // Example:
+                // 'category_id' => [
+                //     'entity' => 'categories',
+                //     'endpoint' => '/api/crud/categories',
+                //     'labelField' => 'name',
+                //     'valueField' => 'id',
+                //     'type' => 'single', // or 'multiple'
+                //     'searchable' => true,
+                //     'nullable' => true,
+                //     'dependsOn' => null // Optional: for dependent dropdowns
+                // ],
+            ],
+            'relationships' => [], // Laravel Eloquent relationships (for eager loading)
             'soft_deletes' => false,
         ];
 
