@@ -7,20 +7,10 @@ namespace AshiqueAr\LaravelCrudGenerator\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Arr;
 
-/**
- * Generate CRUD relations command.
- *
- * This command helps generate relation configurations for existing CRUD resources
- * by analyzing database foreign keys and suggesting relation configs.
- */
 class GenerateCrudRelations extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'crud:relations
                             {resource : The name of the resource to generate relations for}
                             {--field= : Specific field to create relation for (e.g., category_id)}
@@ -34,21 +24,12 @@ class GenerateCrudRelations extends Command
                             {--filter-by= : Field to filter by when depends-on is set (default: same as depends-on)}
                             {--interactive : Interactive mode to configure relations}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Generate relation configurations for CRUD resources';
+    protected $description = 'Generate or merge relation configurations for existing CRUD resources';
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
         $resource = $this->argument('resource');
-
-        if (!$resource || !is_string($resource)) {
+        if (!is_string($resource) || empty($resource)) {
             $this->error('Resource name is required.');
             return Command::FAILURE;
         }
@@ -59,12 +40,6 @@ class GenerateCrudRelations extends Command
             return Command::FAILURE;
         }
 
-        $config = include $configPath;
-        if (!isset($config['resources'][$resource])) {
-            $this->error("Resource '{$resource}' not found in CRUD configuration.");
-            return Command::FAILURE;
-        }
-
         if ($this->option('interactive')) {
             return $this->runInteractiveMode($resource);
         }
@@ -72,146 +47,135 @@ class GenerateCrudRelations extends Command
         return $this->addSingleRelation($resource);
     }
 
-    /**
-     * Run interactive mode to configure multiple relations.
-     */
     protected function runInteractiveMode(string $resource): int
     {
-        $this->info("Interactive relation configuration for resource: {$resource}");
-        $this->newLine();
-
+        $this->info("Interactive relation configuration for resource: {$resource}\n");
         $relations = [];
 
         while (true) {
             $field = $this->ask('Enter field name (e.g., category_id) or press Enter to finish');
-
             if (empty($field)) {
                 break;
             }
-
             $relation = $this->collectRelationData($field);
             if ($relation) {
                 $relations[$field] = $relation;
-                $this->info("✓ Added relation for field: {$field}");
+                $this->info("✓ Queued relation for field: {$field}\n");
             }
         }
 
         if (empty($relations)) {
-            $this->warn('No relations were configured.');
+            $this->warn('No relations configured.');
             return Command::SUCCESS;
         }
 
         return $this->updateResourceWithRelations($resource, $relations);
     }
 
-    /**
-     * Add a single relation based on command options.
-     */
     protected function addSingleRelation(string $resource): int
     {
         $field = $this->option('field');
-
         if (!$field) {
-            $this->error('Field name is required. Use --field option or --interactive mode.');
+            $this->error('Field name is required. Use --field or --interactive mode.');
             return Command::FAILURE;
         }
 
         $relation = [
             'entity' => $this->option('entity') ?: $this->guessEntityFromField($field),
-            'labelField' => $this->option('label-field') ?: 'name',
-            'valueField' => $this->option('value-field') ?: 'id',
-            'displayField' => $this->option('display-field') ?: $this->option('label-field') ?: 'name',
-            'searchable' => $this->option('searchable') ? true : false,
+            'labelField' => $this->option('label-field'),
+            'valueField' => $this->option('value-field'),
+            'displayField' => $this->option('display-field') ?: $this->option('label-field'),
+            'searchable' => (bool) $this->option('searchable'),
             'required' => !$this->option('nullable'),
         ];
 
-        if ($dependsOn = $this->option('depends-on')) {
-            $relation['depends_on'] = $dependsOn;
-            $relation['filter_by'] = $this->option('filter-by') ?: $dependsOn;
+        if ($depends = $this->option('depends-on')) {
+            $relation['depends_on'] = $depends;
+            $relation['filter_by'] = $this->option('filter-by') ?: $depends;
         }
 
         return $this->updateResourceWithRelations($resource, [$field => $relation]);
     }
 
-    /**
-     * Collect relation data interactively.
-     */
     protected function collectRelationData(string $field): ?array
     {
         $entity = $this->ask('Entity name', $this->guessEntityFromField($field));
         $labelField = $this->ask('Label field', 'name');
         $valueField = $this->ask('Value field', 'id');
         $displayField = $this->ask('Display field (for tables)', $labelField);
-        $searchable = $this->confirm('Make searchable?', true);
-        $required = $this->confirm('Is this field required?', false);
-        $dependsOn = $this->ask('Depends on field (optional)');
-        $filterBy = null;
+        $searchable = $this->confirm('Make searchable?', false);
+        $required = $this->confirm('Is this field required?', true);
+        $dependsOn = $this->ask('Depends on field (optional)', null);
 
-        if ($dependsOn) {
-            $filterBy = $this->ask('Filter by field', $dependsOn);
-        }
-
-        $relation = [
-            'entity' => $entity,
-            'labelField' => $labelField,
-            'valueField' => $valueField,
-            'displayField' => $displayField,
-            'searchable' => $searchable,
-            'required' => $required,
-        ];
+        $relation = compact('entity', 'labelField', 'valueField', 'displayField', 'searchable', 'required');
 
         if ($dependsOn) {
             $relation['depends_on'] = $dependsOn;
-            $relation['filter_by'] = $filterBy;
+            $relation['filter_by'] = $this->ask('Filter by field', $dependsOn);
         }
 
         return $relation;
     }
 
-    /**
-     * Update the resource configuration with new relations.
-     */
+    protected function guessEntityFromField(string $field): string
+    {
+        $base = Str::replaceLast('_id', '', $field);
+        return Str::plural(Str::kebab($base));
+    }
+
+    protected function showRelationsSummary(array $relations): void
+    {
+        $this->line("\n<options=bold>Relations Summary:</>");
+        foreach ($relations as $field => $rel) {
+            $this->line("• <comment>{$field}</comment> → {$rel['entity']}");
+            $this->line("  Label: {$rel['labelField']}, Display: {$rel['displayField']}");
+            $this->line("  Required: " . ($rel['required'] ? 'Yes' : 'No') . ", Searchable: " . ($rel['searchable'] ? 'Yes' : 'No'));
+            if (isset($rel['depends_on'])) {
+                $this->line("  Depends on: {$rel['depends_on']} (filter by: {$rel['filter_by']})");
+            }
+        }
+        $this->line("\n<options=bold>Next Steps:</>");
+        $this->line('1. Review <comment>config/crud.php</comment>');
+        $this->line('2. Test your updated forms & endpoints');
+        $this->newLine();
+    }
+
     protected function updateResourceWithRelations(string $resource, array $relations): int
     {
         $path = config_path('crud.php');
-        $content = File::get($path);
+        $config = include $path;
 
-        // 1) Extract the whole 'resource' => [ ... ],
-        $pattern = "/('{$resource}'\s*=>\s*\[)([\s\S]*?)(\]\s*,)/";
-        if (!preg_match($pattern, $content, $m)) {
-            $this->error("Resource '{$resource}' not found.");
+        if (!isset($config['resources'][$resource])) {
+            $this->error("Resource '{$resource}' not found in CRUD configuration.");
             return Command::FAILURE;
         }
 
-        $body = $m[2];
+        $existing = $config['resources'][$resource]['relationships'] ?? [];
 
-        // 2) Remove any old relationships block
-        $body = preg_replace("/'relationships'\s*=>\s*\[[^\]]*\]\s*,?/", '', $body);
-
-        // 3) Build the fresh relationships snippet
-        $relLines = $this->generateRelationshipsContent($relations);
-        $newRelBlock = "\n'relationships' => [\n"
-            . rtrim($relLines, "\n")
-            . "\n],\n";
-
-        // 4) If there's a middleware key, insert *after* its closing ],
-        //    otherwise fall back to appending at the end of the resource.
-        if (strpos($body, "'middleware'") !== false) {
-            $body = preg_replace(
-                // match 'middleware' => [ ... ],
-                "/('middleware'\s*=>\s*\[[^\]]*\]\s*,)/",
-                "$1" . $newRelBlock,
-                $body,
-                1
-            );
-        } else {
-            $body = rtrim($body) . $newRelBlock;
+        // Filter out duplicates
+        $newRels = [];
+        foreach ($relations as $field => $definition) {
+            if (!array_key_exists($field, $existing)) {
+                $newRels[$field] = $definition;
+            }
         }
 
-        // 5) Put it back into the file
-        $replacement = $m[1] . $body . $m[3];
-        $newContent = preg_replace($pattern, $replacement, $content);
-        File::put($path, $newContent);
+        if (empty($newRels)) {
+            $this->info("No new relations to add for '{$resource}'.");
+            return Command::SUCCESS;
+        }
+
+        // Decide insertion order
+        $where = Arr::get($config, 'add_new_resource_to', 'bottom');
+        $where = in_array($where, ['top', 'bottom'], true) ? $where : 'bottom';
+
+        $merged = $where === 'top'
+            ? $newRels + $existing
+            : $existing + $newRels;
+
+        $config['resources'][$resource]['relationships'] = $merged;
+
+        $this->writeConfigFile($path, $config);
 
         $this->info("✓ Relations for '{$resource}' updated.");
         $this->showRelationsSummary($relations);
@@ -219,71 +183,50 @@ class GenerateCrudRelations extends Command
         return Command::SUCCESS;
     }
 
-
-
-
-
-    /**
-     * Generate the relationships content string.
-     */
-    protected function generateRelationshipsContent(array $relations): string
+    protected function writeConfigFile(string $path, array $config): void
     {
-        $content = '';
-        foreach ($relations as $field => $relation) {
-            $content .= "            '$field' => [\n";
-            $content .= "                'entity' => '{$relation['entity']}',\n";
-            $content .= "                'labelField' => '{$relation['labelField']}',\n";
-            $content .= "                'valueField' => '{$relation['valueField']}',\n";
-            $content .= "                'displayField' => '{$relation['displayField']}',\n";
-            $content .= "                'searchable' => " . ($relation['searchable'] ? 'true' : 'false') . ",\n";
-            $content .= "                'required' => " . ($relation['required'] ? 'true' : 'false') . ",\n";
+        $php = "<?php\n\n";
+        $php .= "declare(strict_types=1);\n\n";
+        $php .= "return " . $this->arrayToShortPhp($config) . ";\n";
 
-            if (isset($relation['depends_on'])) {
-                $content .= "                'depends_on' => '{$relation['depends_on']}',\n";
-            }
-
-            if (isset($relation['filter_by'])) {
-                $content .= "                'filter_by' => '{$relation['filter_by']}',\n";
-            }
-
-            $content .= "            ],\n";
-        }
-
-        return rtrim($content, ",\n");
+        File::put($path, $php);
     }
 
-    /**
-     * Guess entity name from field name.
-     */
-    protected function guessEntityFromField(string $field): string
+    protected function arrayToShortPhp(array $arr, int $lvl = 0): string
     {
-        // Remove _id suffix and pluralize
-        $base = Str::replaceLast('_id', '', $field);
-        return Str::plural(Str::kebab($base));
-    }
+        $indent = str_repeat('    ', $lvl);
+        $lines = ["["];
 
-    /**
-     * Show a summary of configured relations.
-     */
-    protected function showRelationsSummary(array $relations): void
-    {
-        $this->newLine();
-        $this->line('<options=bold>Relations Summary:</>');
+        foreach ($arr as $key => $val) {
+            $prefix = $indent . '    ';
+            $line = $prefix;
 
-        foreach ($relations as $field => $relation) {
-            $this->line("• <comment>{$field}</comment> → {$relation['entity']}");
-            $this->line("  Label: {$relation['labelField']}, Display: {$relation['displayField']}");
-            $this->line("  Required: " . ($relation['required'] ? 'Yes' : 'No') . ", Searchable: " . ($relation['searchable'] ? 'Yes' : 'No'));
-            if (isset($relation['depends_on'])) {
-                $this->line("  Depends on: {$relation['depends_on']} (filter by: {$relation['filter_by']})");
+            if (is_string($key)) {
+                $line .= var_export($key, true) . ' => ';
             }
+
+            $line .= $this->valueToPhp($val, $lvl + 1) . ',';
+            $lines[] = $line;
         }
 
-        $this->newLine();
-        $this->line('<options=bold>Next Steps:</>');
-        $this->line('1. Review the generated relationships in <comment>config/crud.php</comment>');
-        $this->line('2. Ensure the target resources exist and are accessible');
-        $this->line('3. Test the dynamic frontend forms with the new relationships');
-        $this->newLine();
+        $lines[] = $indent . "]";
+        return implode("\n", $lines);
+    }
+
+    protected function valueToPhp($val, int $lvl): string
+    {
+        if (is_array($val)) {
+            return $this->arrayToShortPhp($val, $lvl);
+        }
+
+        if (is_bool($val)) {
+            return $val ? 'true' : 'false';
+        }
+
+        if (is_null($val)) {
+            return 'null';
+        }
+
+        return var_export($val, true);
     }
 }
